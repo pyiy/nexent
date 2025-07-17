@@ -27,10 +27,6 @@ jobs:
       - name: Build main image (amd64) and load locally
         run: |
           docker buildx build --platform linux/amd64 -t nexent/nexent:beta-amd64 --load -t ccr.ccs.tencentyun.com/nexent-hub/nexent:beta-amd64 -f make/main/Dockerfile .
-      - name: Login to DockerHub
-        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u nexent --password-stdin
-      - name: Push main image (amd64) to DockerHub
-        run: docker push nexent/nexent:beta-amd64
       - name: Logout Tencent Cloud
         run: docker logout ccr.ccs.tencentyun.com
       - name: Login to Tencent Cloud
@@ -53,10 +49,6 @@ jobs:
       - name: Build main image (arm64) and load locally
         run: |
           docker buildx build --platform linux/arm64 -t nexent/nexent:beta-arm64 --load -t ccr.ccs.tencentyun.com/nexent-hub/nexent:beta-arm64 -f make/main/Dockerfile .
-      - name: Login to DockerHub
-        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u nexent --password-stdin
-      - name: Push main image (arm64) to DockerHub
-        run: docker push nexent/nexent:beta-arm64
       - name: Logout Tencent Cloud
         run: docker logout ccr.ccs.tencentyun.com
       - name: Login to Tencent Cloud
@@ -98,10 +90,6 @@ jobs:
       - name: Build data process image (amd64) and load locally
         run: |
           docker buildx build --platform linux/amd64 -t nexent/nexent-data-process:beta-amd64 --load -t ccr.ccs.tencentyun.com/nexent-hub/nexent-data-process:beta-amd64 -f make/data_process/Dockerfile .
-      - name: Login to DockerHub
-        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u nexent --password-stdin
-      - name: Push data process image (amd64) to DockerHub
-        run: docker push nexent/nexent-data-process:beta-amd64
       - name: Logout Tencent Cloud
         run: docker logout ccr.ccs.tencentyun.com
       - name: Login to Tencent Cloud
@@ -143,10 +131,6 @@ jobs:
       - name: Build data process image (arm64) and load locally
         run: |
           docker buildx build --platform linux/arm64 -t nexent/nexent-data-process:beta-arm64 --load -t ccr.ccs.tencentyun.com/nexent-hub/nexent-data-process:beta-arm64 -f make/data_process/Dockerfile .
-      - name: Login to DockerHub
-        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u nexent --password-stdin
-      - name: Push data process image (arm64) to DockerHub
-        run: docker push nexent/nexent-data-process:beta-arm64
       - name: Logout Tencent Cloud
         run: docker logout ccr.ccs.tencentyun.com
       - name: Login to Tencent Cloud
@@ -169,10 +153,6 @@ jobs:
       - name: Build web image (amd64) and load locally
         run: |
           docker buildx build --platform linux/amd64 -t nexent/nexent-web:beta-amd64 --load -t ccr.ccs.tencentyun.com/nexent-hub/nexent-web:beta-amd64 -f make/web/Dockerfile .
-      - name: Login to DockerHub
-        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u nexent --password-stdin
-      - name: Push web image (amd64) to DockerHub
-        run: docker push nexent/nexent-web:beta-amd64
       - name: Logout Tencent Cloud
         run: docker logout ccr.ccs.tencentyun.com
       - name: Login to Tencent Cloud
@@ -195,10 +175,6 @@ jobs:
       - name: Build web image (arm64) and load locally
         run: |
           docker buildx build --platform linux/arm64 -t nexent/nexent-web:beta-arm64 --load -t ccr.ccs.tencentyun.com/nexent-hub/nexent-web:beta-arm64 -f make/web/Dockerfile .
-      - name: Login to DockerHub
-        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u nexent --password-stdin
-      - name: Push web image (arm64) to DockerHub
-        run: docker push nexent/nexent-web:beta-arm64
       - name: Logout Tencent Cloud
         run: docker logout ccr.ccs.tencentyun.com
       - name: Login to Tencent Cloud
@@ -212,14 +188,6 @@ jobs:
       - build-and-push-main-amd64
       - build-and-push-main-arm64
     steps:
-      - name: Login to DockerHub
-        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u nexent --password-stdin
-      - name: Create and push manifest for main (DockerHub)
-        run: |
-          docker manifest create nexent/nexent:beta \
-            nexent/nexent:beta-amd64 \
-            nexent/nexent:beta-arm64
-          docker manifest push nexent/nexent:beta
       - name: Logout Tencent Cloud
         run: docker logout ccr.ccs.tencentyun.com
       - name: Login to Tencent Cloud
@@ -237,14 +205,6 @@ jobs:
       - build-and-push-data-process-amd64
       - build-and-push-data-process-arm64
     steps:
-      - name: Login to DockerHub
-        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u nexent --password-stdin
-      - name: Create and push manifest for data-process (DockerHub)
-        run: |
-          docker manifest create nexent/nexent-data-process:beta \
-            nexent/nexent-data-process:beta-amd64 \
-            nexent/nexent-data-process:beta-arm64
-          docker manifest push nexent/nexent-data-process:beta
       - name: Logout Tencent Cloud
         run: docker logout ccr.ccs.tencentyun.com
       - name: Login to Tencent Cloud
@@ -262,14 +222,6 @@ jobs:
       - build-and-push-web-amd64
       - build-and-push-web-arm64
     steps:
-      - name: Login to DockerHub
-        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u nexent --password-stdin
-      - name: Create and push manifest for web (DockerHub)
-        run: |
-          docker manifest create nexent/nexent-web:beta \
-            nexent/nexent-web:beta-amd64 \
-            nexent/nexent-web:beta-arm64
-          docker manifest push nexent/nexent-web:beta
       - name: Logout Tencent Cloud
         run: docker logout ccr.ccs.tencentyun.com
       - name: Login to Tencent Cloud
