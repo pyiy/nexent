@@ -1,7 +1,7 @@
 import threading
 import yaml
 import logging
-import os
+
 from urllib.parse import urljoin
 from nexent.core.utils.observer import MessageObserver
 from nexent.core.agents.agent_model import AgentRunInfo, ModelConfig, AgentConfig, ToolConfig
