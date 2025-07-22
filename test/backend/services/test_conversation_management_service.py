@@ -1,7 +1,7 @@
 import unittest
 import json
 from datetime import datetime
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, MagicMock, mock_open, ANY
 
 # Mock boto3 and minio client before importing the module under test
 import sys
@@ -206,28 +206,23 @@ class TestConversationManagementService(unittest.TestCase):
         self.assertIn("Give me examples of AI applications", result)
         self.assertIn("AI stands for Artificial Intelligence.", result)
 
-    @patch('backend.services.conversation_management_service.OpenAIServerModel')
+    @patch('backend.services.conversation_management_service.OpenAIModel')
+    @patch('backend.services.conversation_management_service.get_model_factory_type')
+    @patch('backend.services.conversation_management_service.get_model_name_from_config')
     @patch('backend.services.conversation_management_service.open', new_callable=mock_open, read_data="""
 SYSTEM_PROMPT: "Generate a short title"
 USER_PROMPT: "Generate a title for: {{content}}"
 """)
     @patch('backend.services.conversation_management_service.yaml.safe_load')
-    @patch('os.getenv')
     @patch('backend.services.conversation_management_service.tenant_config_manager.get_model_config')
-    def test_call_llm_for_title(self, mock_get_model_config, mock_getenv, mock_yaml_load, mock_open_file, mock_openai):
+    def test_call_llm_for_title(self, mock_get_model_config, mock_yaml_load, mock_open_file, mock_get_model_name, mock_get_model_factory_type, mock_openai):
         # Setup
         mock_get_model_config.return_value = {
-            "model_name": "gpt-4",
-            "model_repo": "openai",
             "base_url": "http://example.com",
             "api_key": "fake-key"
         }
-
-        mock_getenv.side_effect = lambda key: {
-            'LLM_MODEL_NAME': 'gpt-4',
-            'LLM_MODEL_URL': 'http://example.com',
-            'LLM_API_KEY': 'fake-key'
-        }.get(key)
+        mock_get_model_name.return_value = "gpt-4"
+        mock_get_model_factory_type.return_value = "openai"  # Use OpenAI model, not restful
 
         mock_yaml_data = {
             "SYSTEM_PROMPT": "Generate a short title",
@@ -235,18 +230,26 @@ USER_PROMPT: "Generate a title for: {{content}}"
         }
         mock_yaml_load.return_value = mock_yaml_data
 
-        mock_llm_instance = mock_openai.return_value
+        # Mock the LLM instance and its response
+        mock_llm_instance = MagicMock()
         mock_response = MagicMock()
         mock_response.content = "AI Discussion"
         mock_llm_instance.return_value = mock_response
+        mock_openai.return_value = mock_llm_instance
 
         # Execute
         result = call_llm_for_title("What is AI? AI stands for Artificial Intelligence.", tenant_id="default")
 
         # Assert
         self.assertEqual(result, "AI Discussion")
-        mock_openai.assert_called_once()
-        mock_llm_instance.assert_called_once()
+        mock_openai.assert_called_once_with(
+            observer=ANY,  # Using ANY because observer is complex to mock
+            model_id="gpt-4",
+            api_base="http://example.com",
+            api_key="fake-key",
+            temperature=0.7,
+            top_p=0.95
+        )
 
     @patch('backend.services.conversation_management_service.rename_conversation')
     def test_update_conversation_title(self, mock_rename_conversation):

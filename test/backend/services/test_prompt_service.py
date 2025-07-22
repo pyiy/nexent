@@ -36,12 +36,11 @@ class TestPromptService(unittest.TestCase):
         # Reset all mocks before each test
         minio_client_mock.reset_mock()
 
-    @patch('backend.services.prompt_service.OpenAIServerModel')
+    @patch('backend.services.prompt_service.OpenAIModel')
     @patch('backend.services.prompt_service.tenant_config_manager')
     @patch('backend.services.prompt_service.get_model_name_from_config')
-    @patch('nexent.vector_database.elasticsearch_core.ElasticSearchCore')
-    @patch('elasticsearch.Elasticsearch')
-    def test_call_llm_for_system_prompt(self, mock_elasticsearch, mock_es_core, mock_get_model_name, mock_tenant_config, mock_openai):
+    @patch('backend.services.prompt_service.get_model_factory_type')
+    def test_call_llm_for_system_prompt(self, mock_get_model_factory_type, mock_get_model_name, mock_tenant_config, mock_openai):
         # Setup
         mock_model_config = {
             "base_url": "http://example.com",
@@ -49,18 +48,14 @@ class TestPromptService(unittest.TestCase):
         }
         mock_tenant_config.get_model_config.return_value = mock_model_config
         mock_get_model_name.return_value = "gpt-4"
+        mock_get_model_factory_type.return_value = "openai"  # Use OpenAI model, not restful
         
-        mock_llm_instance = mock_openai.return_value
-        
-        # Mock the streaming response
-        mock_chunk = MagicMock()
-        mock_chunk.choices = [MagicMock()]
-        mock_chunk.choices[0].delta.content = "Generated prompt"
-        
-        # Set up the client.chat.completions.create mock
-        mock_llm_instance.client = MagicMock()
-        mock_llm_instance.client.chat.completions.create.return_value = [mock_chunk]
-        mock_llm_instance._prepare_completion_kwargs.return_value = {}
+        # Mock the LLM instance and its response
+        mock_llm_instance = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = "Generated prompt"
+        mock_llm_instance.return_value = mock_response
+        mock_openai.return_value = mock_llm_instance
         
         # Execute
         result = call_llm_for_system_prompt("user prompt", "system prompt")
@@ -68,6 +63,7 @@ class TestPromptService(unittest.TestCase):
         # Assert
         self.assertEqual(result, "Generated prompt")
         mock_openai.assert_called_once_with(
+            observer=ANY,  # Using ANY because observer is complex to mock
             model_id="gpt-4",
             api_base="http://example.com",
             api_key="fake-key",
@@ -310,13 +306,12 @@ FINE_TUNE_SYSTEM_PROMPT: "Fine Tune System Prompt"
             system_prompt="Fine Tune System Prompt",
             tenant_id="test_tenant"
         )
-        
-    @patch('backend.services.prompt_service.OpenAIServerModel')
+
+    @patch('backend.services.prompt_service.OpenAIModel')
     @patch('backend.services.prompt_service.tenant_config_manager')
     @patch('backend.services.prompt_service.get_model_name_from_config')
-    @patch('nexent.vector_database.elasticsearch_core.ElasticSearchCore')
-    @patch('elasticsearch.Elasticsearch')
-    def test_call_llm_for_system_prompt_exception(self, mock_elasticsearch, mock_es_core, mock_get_model_name, mock_tenant_config, mock_openai):
+    @patch('backend.services.prompt_service.get_model_factory_type')
+    def test_call_llm_for_system_prompt_exception(self, mock_get_model_factory_type, mock_get_model_name, mock_tenant_config, mock_openai):
         # Setup
         mock_model_config = {
             "base_url": "http://example.com",
@@ -324,11 +319,12 @@ FINE_TUNE_SYSTEM_PROMPT: "Fine Tune System Prompt"
         }
         mock_tenant_config.get_model_config.return_value = mock_model_config
         mock_get_model_name.return_value = "gpt-4"
+        mock_get_model_factory_type.return_value = "openai"
         
-        mock_llm_instance = mock_openai.return_value
-        mock_llm_instance.client = MagicMock()
-        mock_llm_instance.client.chat.completions.create.side_effect = Exception("LLM error")
-        mock_llm_instance._prepare_completion_kwargs.return_value = {}
+        # Mock the LLM instance to raise an exception
+        mock_llm_instance = MagicMock()
+        mock_llm_instance.side_effect = Exception("LLM error")
+        mock_openai.return_value = mock_llm_instance
         
         # Execute and Assert
         with self.assertRaises(Exception) as context:

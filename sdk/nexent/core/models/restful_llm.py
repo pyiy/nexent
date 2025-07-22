@@ -125,6 +125,7 @@ class RestfulLLMModel:
             # Add stop sequences (if supported)
             if stop_sequences:
                 request_body["stop"] = stop_sequences
+                request_body["include_stop_str_in_output"] = True
             
             # Send streaming request
             response = requests.post(
