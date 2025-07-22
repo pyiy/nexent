@@ -10,7 +10,7 @@ logger = logging.getLogger("model_factory")
 
 
 class BaseModelFactory(ABC):
-    """模型工厂基类"""
+    """Base model factory class""" 
     
     @abstractmethod
     def create_model(self, 
@@ -18,36 +18,36 @@ class BaseModelFactory(ABC):
                     model_config: Dict[str, Any],
                     **kwargs) -> Any:
         """
-        创建模型实例
+        Create model instance
         
         Args:
-            observer: 消息观察者
-            model_config: 模型配置信息
-            **kwargs: 其他参数
+            observer: Message observer
+            model_config: Model configuration information
+            **kwargs: Other parameters
             
         Returns:
-            模型实例
+            Model instance
         """
         pass
 
 
 class OpenAIModelFactory(BaseModelFactory):
-    """OpenAI兼容模型工厂"""
+    """OpenAI compatible model factory"""
     
     def create_model(self, 
                     observer: MessageObserver,
                     model_config: Dict[str, Any],
                     **kwargs) -> OpenAIModel:
         """
-        创建OpenAI兼容模型实例
+        Create OpenAI compatible model instance
         
         Args:
-            observer: 消息观察者
-            model_config: 模型配置信息
-            **kwargs: 其他参数
+            observer: Message observer
+            model_config: Model configuration information
+            **kwargs: Other parameters
             
         Returns:
-            OpenAIModel实例
+            OpenAIModel instance
         """
         return OpenAIModel(
             observer=observer,
@@ -61,22 +61,22 @@ class OpenAIModelFactory(BaseModelFactory):
 
 
 class RestfulLLMModelFactory(BaseModelFactory):
-    """RESTful LLM模型工厂"""
+    """RESTful LLM model factory"""
     
     def create_model(self, 
                     observer: MessageObserver,
                     model_config: Dict[str, Any],
                     **kwargs) -> RestfulLLMModel:
         """
-        创建RESTful LLM模型实例
+        Create RESTful LLM model instance
         
         Args:
-            observer: 消息观察者
-            model_config: 模型配置信息
-            **kwargs: 其他参数
+            observer: Message observer
+            model_config: Model configuration information
+            **kwargs: Other parameters
             
         Returns:
-            RestfulLLMModel实例
+            RestfulLLMModel instance
         """
         return RestfulLLMModel(
             observer=observer,
@@ -91,7 +91,7 @@ class RestfulLLMModelFactory(BaseModelFactory):
 
 
 class ModelFactoryManager:
-    """模型工厂管理器"""
+    """Model factory manager"""
     def __init__(self):
         self._factories = {
             "openai": OpenAIModelFactory(),
@@ -104,18 +104,18 @@ class ModelFactoryManager:
     
     def create_model(self, observer: MessageObserver, model_config: Dict[str, Any], **kwargs) -> Any:
         """
-        根据配置创建模型实例
+        Create model instance according to configuration
         
         Args:
-            observer: 消息观察者
-            model_config: 模型配置信息
-            **kwargs: 其他参数
+            observer: Message observer
+            model_config: Model configuration information
+            **kwargs: Other parameters
             
         Returns:
-            模型实例
+            Model instance
             
         Raises:
-            ValueError: 当不支持的模型工厂类型时
+            ValueError: When unsupported model factory type
         """
         factory_name = model_config.get("model_factory", "openai")
         
@@ -129,7 +129,7 @@ class ModelFactoryManager:
     def get_supported_factories(self):
         return list(self._factories.keys())
 
-# 全局模型工厂管理器实例
+# Global model factory manager instance
 model_factory_manager = ModelFactoryManager()
 
 def create_model_from_config(observer: MessageObserver, model_config: Dict[str, Any], **kwargs) -> Any:

@@ -23,16 +23,16 @@ class RestfulLLMModel:
                  timeout: int = 60,
                  *args, **kwargs):
         """
-        初始化RESTful LLM模型
+        Initialize RESTful LLM model
         
         Args:
-            observer: 消息观察者，用于处理流式输出
-            base_url: API基础URL
-            api_key: API密钥，将作为Bearer Token使用
-            model_name: 模型名称
-            temperature: 温度参数
-            top_p: top_p参数
-            timeout: 请求超时时间
+            observer: Message observer, used to handle streaming output
+            base_url: API base URL
+            api_key: API key, will be used as Bearer Token
+            model_name: Model name
+            temperature: Temperature parameter
+            top_p: top_p parameter
+            timeout: Request timeout
         """
         self.observer = observer
         self.base_url = base_url.rstrip('/')
@@ -43,7 +43,7 @@ class RestfulLLMModel:
         self.timeout = timeout
         self.stop_event = threading.Event()
         
-        # 设置请求头
+        # Set request headers
         self.headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
@@ -56,20 +56,20 @@ class RestfulLLMModel:
                  tools_to_call_from: Optional[List[Tool]] = None, 
                  **kwargs) -> ChatMessage:
         """
-        调用RESTful LLM模型
+        Call RESTful LLM model
         
         Args:
-            messages: 消息列表
-            stop_sequences: 停止序列
-            grammar: 语法规则
-            tools_to_call_from: 可用工具列表
-            **kwargs: 其他参数
+            messages: Message list
+            stop_sequences: Stop sequences
+            grammar: Grammar rules
+            tools_to_call_from: Available tool list
+            **kwargs: Other parameters
             
         Returns:
-            ChatMessage: 模型响应消息
+            ChatMessage: Model response message
         """
         try:
-            # 准备请求体
+            # Prepare request body
             request_body = {
                 "model": self.model_name,
                 "stream": True,
@@ -79,11 +79,11 @@ class RestfulLLMModel:
                 **kwargs
             }
             
-            # 添加停止序列（如果支持）
+            # Add stop sequences (if supported)
             if stop_sequences:
                 request_body["stop"] = stop_sequences
             
-            # 发送流式请求
+            # Send streaming request
             response = requests.post(
                 urljoin(self.base_url, "/chat/completions"),
                 headers=self.headers,
@@ -93,27 +93,27 @@ class RestfulLLMModel:
             )
             
             if response.status_code != 200:
-                raise Exception(f"API请求失败: {response.status_code} - {response.text}")
+                raise Exception(f"API request failed: {response.status_code} - {response.text}")
             
             chunk_list = []
             token_join = []
             role = None
             
-            # 重置输出模式
+            # Reset output mode
             self.observer.current_mode = ProcessType.MODEL_OUTPUT_THINKING
             
-            # 处理流式响应
+            # Process streaming response
             for line in response.iter_lines():
                 if self.stop_event.is_set():
                     raise RuntimeError("Model is interrupted by stop event")
                 
                 if line:
-                    # 移除 "data: " 前缀（如果存在）
+                    # Remove "data: " prefix (if exists)
                     line_str = line.decode('utf-8')
                     if line_str.startswith("data: "):
                         line_str = line_str[6:]
                     
-                    # 跳过 [DONE] 标记
+                    # Skip [DONE] marker
                     if line_str.strip() == "[DONE]":
                         break
                     
@@ -122,7 +122,7 @@ class RestfulLLMModel:
                         if "choices" in chunk_data and len(chunk_data["choices"]) > 0:
                             choice = chunk_data["choices"][0]
                             
-                            # 处理增量内容
+                            # Process incremental content
                             if "delta" in choice:
                                 delta = choice["delta"]
                                 if "content" in delta and delta["content"]:
@@ -135,14 +135,14 @@ class RestfulLLMModel:
                             
                             chunk_list.append(chunk_data)
                     except json.JSONDecodeError:
-                        logger.warning(f"无法解析JSON响应: {line_str}")
+                        logger.warning(f"Cannot parse JSON response: {line_str}")
                         continue
             
-            # 发送结束标记
+            # Send end marker
             self.observer.flush_remaining_tokens()
             model_output = "".join(token_join)
             
-            # 创建响应消息
+            # Create response message
             message = ChatMessage(
                 role=role if role else "assistant",
                 content=model_output
@@ -158,16 +158,16 @@ class RestfulLLMModel:
 
     def check_connectivity(self) -> bool:
         """
-        测试与RESTful LLM服务的连接是否正常
+        Test the connection to the RESTful LLM service
         
         Returns:
-            bool: 连接成功返回True，失败返回False
+            bool: True if connection is successful, False otherwise
         """
         try:
-            # 构造简单的测试消息
+            # Construct a simple test message
             test_message = [{"role": "user", "content": "Hello"}]
             
-            # 发送非流式请求进行连接测试
+            # Send non-streaming request for connection test
             request_body = {
                 "model": self.model_name,
                 "stream": False,
@@ -185,15 +185,15 @@ class RestfulLLMModel:
             if response.status_code == 200:
                 return True
             else:
-                logger.error(f"连接测试失败: {response.status_code} - {response.text}")
+                logger.error(f"Connection test failed: {response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:
-            logger.error(f"连接测试失败: {str(e)}")
+            logger.error(f"Connection test failed: {str(e)}")
             return False
 
     def stop(self):
         """
-        停止模型运行
+        Stop model running
         """
         self.stop_event.set() 

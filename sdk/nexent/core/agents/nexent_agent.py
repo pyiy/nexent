@@ -39,11 +39,11 @@ class NexentAgent:
         if model_config is None:
             raise ValueError(f"Model {model_cite_name} not found")
         
-        # 根据model_factory字段选择不同的模型类型
+        # According to model_factory field to select different model types
         model_factory = getattr(model_config, 'model_factory', 'openai')
         
         if model_factory == "restful":
-            # 创建RESTful LLM模型
+            # Create RESTful LLM model
             model = RestfulLLMModel(
                 observer=self.observer,
                 base_url=model_config.url,
@@ -53,7 +53,7 @@ class NexentAgent:
                 top_p=model_config.top_p
             )
         else:
-            # 默认创建OpenAI兼容模型
+            # Create OpenAI compatible model by default
             model = OpenAIModel(
                 observer=self.observer,
                 model_id=model_config.model_name,

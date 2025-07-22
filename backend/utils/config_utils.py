@@ -47,13 +47,13 @@ def get_model_name_from_config(model_config: Dict[str, Any]) -> str:
 
 
 def get_model_factory_type(base_url: str) -> str:
-    """根据base_url判断应该使用哪种模型工厂
+    """Judge which model factory to use according to base_url
 
     Args:
-        base_url (str): 模型的base_url
+        base_url (str): base_url of the model
 
     Returns:
-        str: 模型工厂类型，'openai' 或 'restful'
+        str: model factory type, 'openai' or 'restful'
     """
     if (MODEL_ENGINE_HOST and MODEL_ENGINE_HOST in base_url) or "/open/router" in base_url:
         return "restful"
