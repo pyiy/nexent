@@ -8,7 +8,7 @@ from nexent.core.models import OpenAIModel, RestfulLLMModel, OpenAIVLModel
 from nexent.core.models.embedding_model import JinaEmbedding, OpenAICompatibleEmbedding
 
 from utils.auth_utils import get_current_user_id
-from utils.config_utils import config_manager, get_model_factory_type, get_model_name_from_config
+from utils.config_utils import get_model_factory_type, get_model_name_from_config
 
 from apps.voice_app import VoiceService
 from consts.const import MODEL_ENGINE_APIKEY, MODEL_ENGINE_HOST
