@@ -26,6 +26,7 @@ class OpenAIModel(OpenAIServerModel):
                 grammar=grammar, tools_to_call_from=tools_to_call_from, model=self.model_id,
                 custom_role_conversions=self.custom_role_conversions, convert_images_to_image_urls=True,
                 temperature=self.temperature, top_p=self.top_p, **kwargs, )
+            completion_kwargs.pop("http_client")
 
             current_request = self.client.chat.completions.create(stream=True, **completion_kwargs)
             chunk_list = []
@@ -88,5 +89,5 @@ class OpenAIModel(OpenAIServerModel):
             # If no exception is raised, the connection is successful
             return True
         except Exception as e:
-            logging.error(f"Connection test failed: {str(e)}")
+            logging.exception(f"Connection test failed: {str(e)}")
             return False

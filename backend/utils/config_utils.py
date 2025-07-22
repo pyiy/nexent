@@ -55,7 +55,7 @@ def get_model_factory_type(base_url: str) -> str:
     Returns:
         str: model factory type, 'openai' or 'restful'
     """
-    if (MODEL_ENGINE_HOST and MODEL_ENGINE_HOST in base_url) or "/open/router" in base_url:
+    if (MODEL_ENGINE_HOST and MODEL_ENGINE_HOST in base_url):
         return "restful"
     else:
         return "openai"

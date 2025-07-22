@@ -4,14 +4,15 @@ import threading
 
 import yaml
 from jinja2 import StrictUndefined, Template
-from smolagents import OpenAIServerModel
+from nexent.core.utils.observer import MessageObserver
+from nexent.core.models import OpenAIModel, RestfulLLMModel
 
 from consts.model import AgentInfoRequest
 from database.agent_db import query_sub_agents, update_agent, \
     query_tools_by_ids
 from services.agent_service import get_enable_tool_id_by_agent_id
 from utils.prompt_template_utils import get_prompt_generate_config_path
-from utils.config_utils import tenant_config_manager, get_model_name_from_config
+from utils.config_utils import tenant_config_manager, get_model_name_from_config, get_model_factory_type
 from utils.auth_utils import get_current_user_info
 from fastapi import Header, Request
 
@@ -31,35 +32,54 @@ def call_llm_for_system_prompt(user_prompt: str, system_prompt: str, callback=No
         str: Generated system prompt
     """
     llm_model_config = tenant_config_manager.get_model_config(key="LLM_ID", tenant_id=tenant_id)
+    if not llm_model_config:
+        raise ValueError("LLM model configuration not found")
 
-    llm = OpenAIServerModel(
-        model_id=get_model_name_from_config(llm_model_config) if llm_model_config else "",
-        api_base=llm_model_config.get("base_url", ""),
-        api_key=llm_model_config.get("api_key", ""),
-        temperature=0.3,
-        top_p=0.95
-    )
-    messages = [{"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}]
-    try:
-        completion_kwargs = llm._prepare_completion_kwargs(
-            messages=messages,
-            model=llm.model_id,
+    model_factory_type = get_model_factory_type(llm_model_config.get("base_url", ""))
+    logger.info(f"Selected LLM model: {llm_model_config}, choose {model_factory_type}")
+    model_name = get_model_name_from_config(llm_model_config) if llm_model_config else ""
+
+    class StreamingObserver(MessageObserver):
+        def __init__(self, callback=None):
+            super().__init__()
+            self.callback = callback
+            self.current_text = ""
+
+        def add_model_new_token(self, token: str):
+            super().add_model_new_token(token)
+            self.current_text += token
+            if self.callback:
+                self.callback(self.current_text)
+
+    observer = StreamingObserver(callback)
+    if model_factory_type == "restful":
+        llm = RestfulLLMModel(
+            observer=observer,
+            base_url=llm_model_config.get("base_url", ""),
+            api_key=llm_model_config.get("api_key", ""),
+            model_name=model_name,
             temperature=0.3,
             top_p=0.95
         )
-        current_request = llm.client.chat.completions.create(stream=True, **completion_kwargs)
-        token_join = []
-        for chunk in current_request:
-            new_token = chunk.choices[0].delta.content
-            if new_token is not None:
-                token_join.append(new_token)
-                current_text = "".join(token_join)
-                if callback is not None:
-                    callback(current_text)
-        return "".join(token_join)
+    else:
+        llm = OpenAIModel(
+            observer=observer,
+            model_id=model_name,
+            api_base=llm_model_config.get("base_url", ""),
+            api_key=llm_model_config.get("api_key", ""),
+            temperature=0.3,
+            top_p=0.95
+        )
+
+    messages = [{"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}]
+
+    try:
+        response = llm(messages=messages)
+        return response.content
     except Exception as e:
-        logger.error(f"Failed to generate prompt from LLM: {str(e)}")
+        model_type = "RestfulLLM" if model_factory_type == "restful" else "OpenAIModel"
+        logger.error(f"Failed to generate prompt from {model_type}: {str(e)}")
         raise e
 
 

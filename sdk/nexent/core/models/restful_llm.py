@@ -49,6 +49,45 @@ class RestfulLLMModel:
             "Content-Type": "application/json"
         }
 
+    def _convert_messages_format(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Convert messages from smolagents format to simple string format
+        
+        Args:
+            messages: Original messages from smolagents
+            
+        Returns:
+            List[Dict[str, Any]]: Converted messages with string content
+        """
+        converted_messages = []
+        
+        for message in messages:
+            role = message.get("role", "user")
+            content = message.get("content", "")
+            
+            # Handle different content formats
+            if isinstance(content, list):
+                # Extract text from complex content format
+                text_parts = []
+                for item in content:
+                    if isinstance(item, dict):
+                        if item.get("type") == "text" and "text" in item:
+                            text_parts.append(item["text"])
+                        elif "text" in item:
+                            text_parts.append(item["text"])
+                    elif isinstance(item, str):
+                        text_parts.append(item)
+                content = " ".join(text_parts)
+            elif not isinstance(content, str):
+                content = str(content)
+            
+            converted_messages.append({
+                "role": role,
+                "content": content
+            })
+        
+        return converted_messages
+
     def __call__(self, 
                  messages: List[Dict[str, Any]], 
                  stop_sequences: Optional[List[str]] = None,
@@ -69,11 +108,15 @@ class RestfulLLMModel:
             ChatMessage: Model response message
         """
         try:
+            # Convert messages format if needed
+            converted_messages = self._convert_messages_format(messages)
+            
             # Prepare request body
+            url = f"{self.base_url.rstrip('/')}/chat/completions"
             request_body = {
                 "model": self.model_name,
                 "stream": True,
-                "messages": messages,
+                "messages": converted_messages,
                 "temperature": self.temperature,
                 "top_p": self.top_p,
                 **kwargs
@@ -85,14 +128,17 @@ class RestfulLLMModel:
             
             # Send streaming request
             response = requests.post(
-                urljoin(self.base_url, "/chat/completions"),
+                url,
                 headers=self.headers,
-                json=request_body,
+                data=json.dumps(request_body),
                 stream=True,
-                timeout=self.timeout
+                timeout=self.timeout,
+                verify=False
             )
             
             if response.status_code != 200:
+                logger.error(f"Connection test failed: {url=}, {request_body=}, "
+                             f"{response.status_code} - {response.text}")
                 raise Exception(f"API request failed: {response.status_code} - {response.text}")
             
             chunk_list = []
@@ -164,28 +210,29 @@ class RestfulLLMModel:
             bool: True if connection is successful, False otherwise
         """
         try:
-            # Construct a simple test message
+            url = f"{self.base_url.rstrip('/')}/chat/completions"
             test_message = [{"role": "user", "content": "Hello"}]
             
             # Send non-streaming request for connection test
             request_body = {
                 "model": self.model_name,
                 "stream": False,
-                "messages": test_message,
-                "max_tokens": 5
+                "messages": test_message
             }
             
             response = requests.post(
-                urljoin(self.base_url, "/chat/completions"),
+                url,
                 headers=self.headers,
-                json=request_body,
-                timeout=10
+                data=json.dumps(request_body),
+                timeout=10,
+                verify=False
             )
             
             if response.status_code == 200:
                 return True
             else:
-                logger.error(f"Connection test failed: {response.status_code} - {response.text}")
+                logger.error(f"Connection test failed: {url=}, {request_body=}, {self.headers=}, "
+                             f"{response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:

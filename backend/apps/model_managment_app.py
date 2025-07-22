@@ -1,4 +1,5 @@
 from typing import Optional
+import logging
 
 from fastapi import Query, APIRouter, Header
 
@@ -10,6 +11,7 @@ from utils.model_name_utils import split_repo_name, add_repo_to_name
 from utils.auth_utils import get_current_user_id
 
 router = APIRouter(prefix="/model")
+logger = logging.getLogger("model_management_app")
 
 
 @router.post("/create", response_model=ModelResponse)
@@ -195,6 +197,7 @@ async def verify_model_config(request: ModelRequest):
         
         return result
     except Exception as e:
+        logger.exception(f"Failed to verify model config: {str(e)}")
         return ModelResponse(
             code=500,
             message=f"Failed to verify model configuration: {str(e)}",

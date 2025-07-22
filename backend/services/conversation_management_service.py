@@ -6,15 +6,15 @@ from datetime import datetime
 from jinja2 import StrictUndefined, Template
 
 from fastapi import HTTPException, Header
-from smolagents import OpenAIServerModel
+from nexent.core.models import RestfulLLMModel, OpenAIModel
+from nexent.core.utils.observer import MessageObserver
 
 from consts.model import MessageRequest, ConversationResponse, AgentRequest, MessageUnit
 from database.conversation_db import create_conversation_message, create_source_search, create_message_units, \
     create_source_image, rename_conversation, get_conversation_list, get_conversation_history, get_source_images_by_message, \
     get_source_images_by_conversation, get_source_searches_by_message, get_source_searches_by_conversation, \
     delete_conversation, get_conversation, create_conversation, update_message_opinion
-
-from utils.config_utils import tenant_config_manager,get_model_name_from_config
+from utils.config_utils import tenant_config_manager, get_model_name_from_config, get_model_factory_type
 
 logger = logging.getLogger("conversation_management_service")
 
@@ -236,10 +236,34 @@ def call_llm_for_title(content: str, tenant_id: str) -> str:
         prompt_template = yaml.safe_load(f)
 
     model_config = tenant_config_manager.get_model_config(key="LLM_ID", tenant_id=tenant_id)
-
-    # Create OpenAIServerModel instance
-    llm = OpenAIServerModel(model_id=get_model_name_from_config(model_config) if model_config.get("model_name") else "", api_base=model_config.get("base_url", ""),
-        api_key=model_config.get("api_key", ""), temperature=0.7, top_p=0.95)
+    if not model_config:
+        raise ValueError("LLM model configuration not found")
+    
+    model_factory_type = get_model_factory_type(model_config.get("base_url", ""))
+    logger.info(f"Selected LLM model: {model_config}, choose {model_factory_type}")
+    model_name = get_model_name_from_config(model_config) if model_config else ""
+    
+    # Create a simple observer for non-streaming calls
+    observer = MessageObserver()
+    
+    if model_factory_type == "restful":
+        llm = RestfulLLMModel(
+            observer=observer,
+            base_url=model_config.get("base_url", ""),
+            api_key=model_config.get("api_key", ""),
+            model_name=model_name,
+            temperature=0.7,
+            top_p=0.95
+        )
+    else:
+        llm = OpenAIModel(
+            observer=observer,
+            model_id=model_name,
+            api_base=model_config.get("base_url", ""),
+            api_key=model_config.get("api_key", ""),
+            temperature=0.7,
+            top_p=0.95
+        )
 
     # Build messages
     compiled_template = Template(prompt_template["USER_PROMPT"], undefined=StrictUndefined)
@@ -252,9 +276,13 @@ def call_llm_for_title(content: str, tenant_id: str) -> str:
                  "content": user_prompt}]
 
     # Call the model
-    response = llm(messages, max_tokens=10)
-
-    return response.content.strip()
+    try:
+        response = llm(messages, max_tokens=10)
+        return response.content.strip()
+    except Exception as e:
+        model_type = "RestfulLLM" if model_factory_type == "restful" else "OpenAIModel"
+        logger.error(f"Failed to generate title from {model_type}: {str(e)}")
+        raise e
 
 
 def update_conversation_title(conversation_id: int, title: str, user_id: str = None) -> bool:
