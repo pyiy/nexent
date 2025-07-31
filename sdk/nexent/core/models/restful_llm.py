@@ -110,7 +110,10 @@ class RestfulLLMModel:
         try:
             # Convert messages format if needed
             converted_messages = self._convert_messages_format(messages)
-            
+            converted_messages = converted_messages
+            logger.info(f"*****************************")
+            logger.info(f"Restful LLM get messages: {converted_messages}")
+            logger.info(f"*****************************")
             # Prepare request body
             url = f"{self.base_url.rstrip('/')}/chat/completions"
             request_body = {
