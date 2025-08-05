@@ -12,18 +12,13 @@ jobs:
   build-and-push-main-amd64:
     runs-on: ${{ fromJson(inputs.runner_label_json) }}
     steps:
-      - name: Set up Docker Buildx
-        run: |
-          if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
-            docker buildx create --name nexent_builder --use
-          else
-            docker buildx use nexent_builder
-          fi
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Build main image (amd64) and load locally
-        run: |
-          docker buildx build --platform linux/amd64 --load -t ccr.ccs.tencentyun.com/nexent-hub/nexent:amd64 -f make/main/Dockerfile .
+        uses: docker/setup-qemu-action@v3
+          docker build --platform linux/amd64 -t ccr.ccs.tencentyun.com/nexent-hub/nexent:amd64 -f make/main/Dockerfile .
       - name: Login to Tencent Cloud
         run: echo ${{ secrets.TCR_PASSWORD }} | docker login ccr.ccs.tencentyun.com --username=${{ secrets.TCR_USERNAME }} --password-stdin
       - name: Push main image (amd64) to Tencent Cloud
@@ -32,18 +27,13 @@ jobs:
   build-and-push-main-arm64:
     runs-on: ${{ fromJson(inputs.runner_label_json) }}
     steps:
-      - name: Set up Docker Buildx
-        run: |
-          if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
-            docker buildx create --name nexent_builder --use
-          else
-            docker buildx use nexent_builder
-          fi
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Build main image (arm64) and load locally
-        run: |
-          docker buildx build --platform linux/arm64 --load -t ccr.ccs.tencentyun.com/nexent-hub/nexent:arm64 -f make/main/Dockerfile .
+        uses: docker/setup-qemu-action@v3
+          docker build --platform linux/arm64 -t ccr.ccs.tencentyun.com/nexent-hub/nexent:arm64 -f make/main/Dockerfile .
       - name: Login to Tencent Cloud
         run: echo ${{ secrets.TCR_PASSWORD }} | docker login ccr.ccs.tencentyun.com --username=${{ secrets.TCR_USERNAME }} --password-stdin
       - name: Push main image (arm64) to Tencent Cloud
@@ -53,26 +43,21 @@ jobs:
     runs-on: ${{ fromJson(inputs.runner_label_json) }}
     steps:
       - name: Free up disk space on GitHub runner
-        run: |
+        uses: docker/setup-qemu-action@v3
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-      - name: Set up Docker Buildx
-        run: |
-          if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
-            docker buildx create --name nexent_builder --use
-          else
-            docker buildx use nexent_builder
-          fi
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Clone model
-        run: |
+        uses: docker/setup-qemu-action@v3
           GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Nexent-AI/model-assets
           cd ./model-assets
           GIT_TRACE=1 GIT_CURL_VERBOSE=1 GIT_LFS_LOG=debug git lfs pull
           rm -rf .git .gitattributes
       - name: Build data process image (amd64) and load locally
-        run: |
-          docker buildx build --platform linux/amd64 --load -t ccr.ccs.tencentyun.com/nexent-hub/nexent-data-process:amd64 -f make/data_process/Dockerfile .
+        uses: docker/setup-qemu-action@v3
+          docker build --platform linux/amd64 -t ccr.ccs.tencentyun.com/nexent-hub/nexent-data-process:amd64 -f make/data_process/Dockerfile .
       - name: Login to Tencent Cloud
         run: echo ${{ secrets.TCR_PASSWORD }} | docker login ccr.ccs.tencentyun.com --username=${{ secrets.TCR_USERNAME }} --password-stdin
       - name: Push data process image (amd64) to Tencent Cloud
@@ -82,26 +67,21 @@ jobs:
     runs-on: ${{ fromJson(inputs.runner_label_json) }}
     steps:
       - name: Free up disk space on GitHub runner
-        run: |
+        uses: docker/setup-qemu-action@v3
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-      - name: Set up Docker Buildx
-        run: |
-          if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
-            docker buildx create --name nexent_builder --use
-          else
-            docker buildx use nexent_builder
-          fi
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Clone model
-        run: |
+        uses: docker/setup-qemu-action@v3
           GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Nexent-AI/model-assets
           cd ./model-assets
           GIT_TRACE=1 GIT_CURL_VERBOSE=1 GIT_LFS_LOG=debug git lfs pull
           rm -rf .git .gitattributes
       - name: Build data process image (arm64) and load locally
-        run: |
-          docker buildx build --platform linux/arm64 --load -t ccr.ccs.tencentyun.com/nexent-hub/nexent-data-process:arm64 -f make/data_process/Dockerfile .
+        uses: docker/setup-qemu-action@v3
+          docker build --platform linux/arm64 -t ccr.ccs.tencentyun.com/nexent-hub/nexent-data-process:arm64 -f make/data_process/Dockerfile .
       - name: Login to Tencent Cloud
         run: echo ${{ secrets.TCR_PASSWORD }} | docker login ccr.ccs.tencentyun.com --username=${{ secrets.TCR_USERNAME }} --password-stdin
       - name: Push data process image (arm64) to Tencent Cloud
@@ -110,18 +90,13 @@ jobs:
   build-and-push-web-amd64:
     runs-on: ${{ fromJson(inputs.runner_label_json) }}
     steps:
-      - name: Set up Docker Buildx
-        run: |
-          if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
-            docker buildx create --name nexent_builder --use
-          else
-            docker buildx use nexent_builder
-          fi
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Build web image (amd64) and load locally
-        run: |
-          docker buildx build --platform linux/amd64 --load -t ccr.ccs.tencentyun.com/nexent-hub/nexent-web:amd64 -f make/web/Dockerfile .
+        uses: docker/setup-qemu-action@v3
+          docker build --platform linux/amd64 -t ccr.ccs.tencentyun.com/nexent-hub/nexent-web:amd64 -f make/web/Dockerfile .
       - name: Login to Tencent Cloud
         run: echo ${{ secrets.TCR_PASSWORD }} | docker login ccr.ccs.tencentyun.com --username=${{ secrets.TCR_USERNAME }} --password-stdin
       - name: Push web image (amd64) to Tencent Cloud
@@ -130,18 +105,13 @@ jobs:
   build-and-push-web-arm64:
     runs-on: ${{ fromJson(inputs.runner_label_json) }}
     steps:
-      - name: Set up Docker Buildx
-        run: |
-          if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
-            docker buildx create --name nexent_builder --use
-          else
-            docker buildx use nexent_builder
-          fi
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Build web image (arm64) and load locally
-        run: |
-          docker buildx build --platform linux/arm64 --load -t ccr.ccs.tencentyun.com/nexent-hub/nexent-web:arm64 -f make/web/Dockerfile .
+        uses: docker/setup-qemu-action@v3
+          docker build --platform linux/arm64 -t ccr.ccs.tencentyun.com/nexent-hub/nexent-web:arm64 -f make/web/Dockerfile .
       - name: Login to Tencent Cloud
         run: echo ${{ secrets.TCR_PASSWORD }} | docker login ccr.ccs.tencentyun.com --username=${{ secrets.TCR_USERNAME }} --password-stdin
       - name: Push web image (arm64) to Tencent Cloud
@@ -156,7 +126,7 @@ jobs:
       - name: Login to Tencent Cloud
         run: echo ${{ secrets.TCR_PASSWORD }} | docker login ccr.ccs.tencentyun.com --username=${{ secrets.TCR_USERNAME }} --password-stdin
       - name: Create and push manifest for main (Tencent Cloud)
-        run: |
+        uses: docker/setup-qemu-action@v3
           docker manifest create ccr.ccs.tencentyun.com/nexent-hub/nexent:latest \
             ccr.ccs.tencentyun.com/nexent-hub/nexent:amd64 \
             ccr.ccs.tencentyun.com/nexent-hub/nexent:arm64
@@ -171,7 +141,7 @@ jobs:
       - name: Login to Tencent Cloud
         run: echo ${{ secrets.TCR_PASSWORD }} | docker login ccr.ccs.tencentyun.com --username=${{ secrets.TCR_USERNAME }} --password-stdin
       - name: Create and push manifest for data-process (Tencent Cloud)
-        run: |
+        uses: docker/setup-qemu-action@v3
           docker manifest create ccr.ccs.tencentyun.com/nexent-hub/nexent-data-process:latest \
             ccr.ccs.tencentyun.com/nexent-hub/nexent-data-process:amd64 \
             ccr.ccs.tencentyun.com/nexent-hub/nexent-data-process:arm64
@@ -186,7 +156,7 @@ jobs:
       - name: Login to Tencent Cloud
         run: echo ${{ secrets.TCR_PASSWORD }} | docker login ccr.ccs.tencentyun.com --username=${{ secrets.TCR_USERNAME }} --password-stdin
       - name: Create and push manifest for web (Tencent Cloud)
-        run: |
+        uses: docker/setup-qemu-action@v3
           docker manifest create ccr.ccs.tencentyun.com/nexent-hub/nexent-web:latest \
             ccr.ccs.tencentyun.com/nexent-hub/nexent-web:amd64 \
             ccr.ccs.tencentyun.com/nexent-hub/nexent-web:arm64
