@@ -12,8 +12,9 @@ jobs:
   build-and-push-main-amd64:
     runs-on: ${{ fromJson(inputs.runner_label_json) }}
     steps:
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up QEMU for multi-architecture builds
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Build main image (amd64) and load locally
@@ -27,8 +28,9 @@ jobs:
   build-and-push-main-arm64:
     runs-on: ${{ fromJson(inputs.runner_label_json) }}
     steps:
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up QEMU for multi-architecture builds
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Build main image (arm64) and load locally
@@ -45,8 +47,9 @@ jobs:
       - name: Free up disk space on GitHub runner
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up QEMU for multi-architecture builds
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Clone model
@@ -69,8 +72,9 @@ jobs:
       - name: Free up disk space on GitHub runner
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up QEMU for multi-architecture builds
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Clone model
@@ -90,8 +94,9 @@ jobs:
   build-and-push-web-amd64:
     runs-on: ${{ fromJson(inputs.runner_label_json) }}
     steps:
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up QEMU for multi-architecture builds
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Build web image (amd64) and load locally
@@ -105,8 +110,9 @@ jobs:
   build-and-push-web-arm64:
     runs-on: ${{ fromJson(inputs.runner_label_json) }}
     steps:
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up QEMU for multi-architecture builds
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Build web image (arm64) and load locally
