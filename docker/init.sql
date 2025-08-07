@@ -63,6 +63,7 @@ COMMENT ON TABLE "conversation_message_unit_t" IS 'Carries agent output content 
 CREATE TABLE IF NOT EXISTS "conversation_record_t" (
   "conversation_id" SERIAL,
   "conversation_title" varchar(100) COLLATE "pg_catalog"."default",
+  "agent_id" INTEGER NOT NULL,
   "delete_flag" varchar(1) COLLATE "pg_catalog"."default" DEFAULT 'N'::character varying,
   "update_time" timestamp(0) DEFAULT CURRENT_TIMESTAMP,
   "create_time" timestamp(0) DEFAULT CURRENT_TIMESTAMP,
@@ -72,6 +73,7 @@ CREATE TABLE IF NOT EXISTS "conversation_record_t" (
 );
 ALTER TABLE "conversation_record_t" OWNER TO "root";
 COMMENT ON COLUMN "conversation_record_t"."conversation_title" IS 'Conversation title';
+COMMENT ON COLUMN "conversation_record_t"."agent_id" IS 'Agent ID used in this conversation';
 COMMENT ON COLUMN "conversation_record_t"."delete_flag" IS 'When deleted by user frontend, delete flag will be set to true, achieving soft delete effect. Optional values Y/N';
 COMMENT ON COLUMN "conversation_record_t"."update_time" IS 'Update time, audit field';
 COMMENT ON COLUMN "conversation_record_t"."create_time" IS 'Creation time, audit field';

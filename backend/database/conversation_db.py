@@ -45,12 +45,13 @@ class ConversationHistory(TypedDict):
     image_records: List[ImageRecord]
 
 
-def create_conversation(conversation_title: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+def create_conversation(conversation_title: str, agent_id: Optional[int] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Create a new conversation record
 
     Args:
         conversation_title: Conversation title
+        agent_id: Optional agent ID used in this conversation
         user_id: Reserved parameter for created_by and updated_by fields
 
     Returns:
@@ -59,9 +60,13 @@ def create_conversation(conversation_title: str, user_id: Optional[str] = None) 
     with get_db_session() as session:
         # Prepare data dictionary
         data = {"conversation_title": conversation_title, "delete_flag": 'N'}
+        if agent_id is not None:
+            data["agent_id"] = agent_id
+            
         stmt = insert(ConversationRecord).values(**data).returning(
             ConversationRecord.conversation_id,
             ConversationRecord.conversation_title,
+            ConversationRecord.agent_id,
             (func.extract('epoch', ConversationRecord.create_time) * 1000).label('create_time'),
             (func.extract('epoch', ConversationRecord.update_time) * 1000).label('update_time')
         )
@@ -72,6 +77,7 @@ def create_conversation(conversation_title: str, user_id: Optional[str] = None) 
         result_dict = {
             "conversation_id": record.conversation_id,
             "conversation_title": record.conversation_title,
+            "agent_id": record.agent_id,
             "create_time": int(record.create_time),
             "update_time": int(record.update_time)
         }
@@ -259,6 +265,7 @@ def get_conversation_list(user_id: Optional[str] = None) -> List[Dict[str, Any]]
         stmt = select(
             ConversationRecord.conversation_id,
             ConversationRecord.conversation_title,
+            ConversationRecord.agent_id,
             (func.extract('epoch', ConversationRecord.create_time) * 1000).label('create_time'),
             (func.extract('epoch', ConversationRecord.update_time) * 1000).label('update_time')
         ).where(

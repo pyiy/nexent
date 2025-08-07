@@ -30,17 +30,19 @@ async def create_new_conversation_endpoint(request: ConversationRequest, authori
     Args:
         request: ConversationRequest object containing:
             - title: Conversation title, default is "New Conversation"
+            - agent_id: Optional agent ID used in this conversation
         authorization: Authorization header
 
     Returns:
         ConversationResponse object containing:
             - conversation_id: Conversation ID
             - conversation_title: Conversation title
+            - agent_id: Agent ID used in this conversation
             - create_time: Creation timestamp (milliseconds)
             - update_time: Update timestamp (milliseconds)
     """
     try:
-        conversation_data = create_new_conversation(request.title)
+        conversation_data = create_new_conversation(request.title, request.agent_id)
         return ConversationResponse(code=0, message="success", data=conversation_data)
     except Exception as e:
         logging.error(f"Failed to create conversation: {str(e)}")

@@ -96,7 +96,7 @@ const PromptEditor = ({ value, onChange, placeholder }: {
       .config(nord)
       .use(commonmark)
       .use(listener)
-  }, []) // Only create once when component mounts
+  }, [value, handleUserChange]) // 添加必要的依赖
 
   // When external value changes, directly update editor content without recreating editor
   useEffect(() => {

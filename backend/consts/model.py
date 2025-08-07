@@ -108,6 +108,7 @@ class MessageRequest(BaseModel):
 
 class ConversationRequest(BaseModel):
     title: str = "新对话"
+    agent_id: Optional[int] = 1
 
 
 class ConversationResponse(BaseModel):

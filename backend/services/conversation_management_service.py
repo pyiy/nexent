@@ -182,6 +182,13 @@ def save_message(request: MessageRequest, authorization: Optional[str] = Header(
 def save_conversation_user(request: AgentRequest, authorization: Optional[str] = None):
     user_role_count = sum(1 for item in getattr(request, "history", []) if item.get("role") == "user")
 
+    # Check if conversation exists, if not create it with agent_id
+    if request.conversation_id and request.conversation_id != -1:
+        existing_conversation = get_conversation(request.conversation_id)
+        if not existing_conversation:
+            # Create new conversation with agent_id if it doesn't exist
+            create_new_conversation("新对话", request.agent_id)
+
     conversation_req = MessageRequest(conversation_id=request.conversation_id, message_idx=user_role_count * 2,
         role="user", message=[MessageUnit(type="string", content=request.query)], minio_files=request.minio_files)
     save_message(conversation_req, authorization=authorization)
@@ -274,18 +281,19 @@ def update_conversation_title(conversation_id: int, title: str, user_id: str = N
     return success
 
 
-def create_new_conversation(title: str) -> Dict[str, Any]:
+def create_new_conversation(title: str, agent_id: Optional[int] = None) -> Dict[str, Any]:
     """
     Create a new conversation
 
     Args:
         title: Conversation title
+        agent_id: Optional agent ID used in this conversation
 
     Returns:
         Dict containing conversation data
     """
     try:
-        conversation_data = create_conversation(title)
+        conversation_data = create_conversation(title, agent_id)
         return conversation_data
     except Exception as e:
         logging.error(f"Failed to create conversation: {str(e)}")

@@ -31,12 +31,13 @@ export const conversationService = {
   },
 
   // Create new conversation
-  async create(title?: string) {
+  async create(title?: string, agent_id?: number) {
     const response = await fetch(API_ENDPOINTS.conversation.create, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({
-        title: title || "new conversation"
+        title: title || "new conversation",
+        agent_id: agent_id
       }),
     });
 

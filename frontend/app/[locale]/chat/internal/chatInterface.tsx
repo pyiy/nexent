@@ -333,7 +333,7 @@ export function ChatInterface() {
       if (!currentConversationId || currentConversationId === -1) {
         // If no session ID or ID is -1, create new conversation first
         try {
-          const createData = await conversationService.create(t("chatInterface.newConversation"));
+          const createData = await conversationService.create(t("chatInterface.newConversation"), selectedAgentId || undefined);
           currentConversationId = createData.conversation_id;
 
           // Update current session state
@@ -750,6 +750,7 @@ export function ChatInterface() {
     setIsSwitchedConversation(false);
     setConversationTitle(t("chatInterface.newConversation"));
     setSelectedConversationId(null);
+    setSelectedAgentId(null);
     
     // 更新 ref 以实时跟踪当前选中的对话
     currentSelectedConversationRef.current = null;
@@ -803,6 +804,9 @@ export function ChatInterface() {
     setSelectedConversationId(dialog.conversation_id);
     setConversationId(dialog.conversation_id);
     setConversationTitle(dialog.conversation_title);
+    
+    // 设置Agent选择器为当前会话使用的Agent
+    setSelectedAgentId(dialog.agent_id || null);
     
     // 更新 ref 以实时跟踪当前选中的对话
     currentSelectedConversationRef.current = dialog.conversation_id;

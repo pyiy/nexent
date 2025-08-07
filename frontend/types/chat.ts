@@ -195,6 +195,7 @@ export interface DialogRecord {
 export interface ConversationListItem {
   conversation_id: number
   conversation_title: string
+  agent_id: number
   create_time: number
   update_time: number
 }
