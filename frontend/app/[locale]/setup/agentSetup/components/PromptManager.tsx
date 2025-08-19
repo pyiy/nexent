@@ -15,6 +15,11 @@ import AgentConfigurationSection from './AgentConfigurationSection'
 import NonEditingOverlay from './NonEditingOverlay'
 import './milkdown-nord.css'
 
+// Replace <end_code> with standard markdown code block ending
+const preprocessContent = (content: string): string => {
+  return content.replace(/<end_code>/g, '```')
+}
+
 // Simplified editor component
 export interface SimplePromptEditorProps {
   value: string
@@ -32,7 +37,8 @@ export function SimplePromptEditor({ value, onChange, height = '100%' }: SimpleP
     if (value !== internalValue) {
       // Only force update editor when change comes from external source
       if (!isInternalChange.current) {
-        setInternalValue(value)
+        const processedValue = preprocessContent(value)
+        setInternalValue(processedValue)
         setEditorKey(prev => prev + 1)
       }
     }
@@ -89,7 +95,8 @@ function ExpandEditModal({ open, title, content, index, onClose, onSave }: Expan
   useEffect(() => {
     if (open) {
       // Always use the latest content when modal opens
-      setEditContent(content)
+      const processedContent = preprocessContent(content)
+      setEditContent(processedContent)
     }
   }, [content, open])
 

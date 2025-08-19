@@ -67,6 +67,11 @@ def call_llm_for_system_prompt(user_prompt: str, system_prompt: str, callback=No
         raise e
 
 
+def preprocess_content(content: str) -> str:
+    """Replace <end_code> tags with standard markdown code block endings"""
+    return content.replace('<end_code>', '```')
+
+
 def generate_and_save_system_prompt_impl(agent_id: int, task_description: str, authorization: str = Header(None),
                                          request: Request = None):
     user_id, tenant_id, language = get_current_user_info(authorization, request)
@@ -93,9 +98,9 @@ def generate_and_save_system_prompt_impl(agent_id: int, task_description: str, a
     agent_info = AgentInfoRequest(
         agent_id=agent_id,
         business_description=task_description,
-        duty_prompt=final_results["duty"],
-        constraint_prompt=final_results["constraint"],
-        few_shots_prompt=final_results["few_shots"],
+        duty_prompt=preprocess_content(final_results["duty"]),
+        constraint_prompt=preprocess_content(final_results["constraint"]),
+        few_shots_prompt=preprocess_content(final_results["few_shots"]),
         name=final_results["agent_var_name"],
         display_name=final_results["agent_display_name"],
         description=final_results["agent_description"]
@@ -249,8 +254,9 @@ def fine_tune_prompt(system_prompt: str, command: str, tenant_id: str, language:
             system_prompt=prompt_for_fine_tune["FINE_TUNE_SYSTEM_PROMPT"],
             tenant_id=tenant_id
         )
+        processed_prompt = preprocess_content(regenerate_prompt)
         logger.info("Successfully completed prompt fine-tuning")
-        return regenerate_prompt
+        return processed_prompt
 
     except Exception as e:
         logger.error(f"Error in prompt fine-tuning process: {str(e)}")
