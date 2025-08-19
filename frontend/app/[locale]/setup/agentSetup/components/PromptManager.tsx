@@ -15,7 +15,6 @@ import AgentConfigurationSection from './AgentConfigurationSection'
 import NonEditingOverlay from './NonEditingOverlay'
 import './milkdown-nord.css'
 
-// Replace <end_code> with standard markdown code block ending
 const preprocessContent = (content: string): string => {
   return content.replace(/<end_code>/g, '```')
 }
