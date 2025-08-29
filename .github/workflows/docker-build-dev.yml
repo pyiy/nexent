@@ -19,10 +19,20 @@ jobs:
         run: |
           echo "=== PR Files Debug Info ==="
           echo "Event name: ${{ github.event_name }}"
-          echo "=== File paths (what contains() checks) ==="
-          echo '${{ toJSON(github.event.pull_request.files.*.filename) }}'
-          echo "=== Full file objects ==="
-          echo '${{ toJSON(github.event.pull_request.files) }}'
+          echo "PR number: ${{ github.event.pull_request.number }}"
+          echo "PR head ref: ${{ github.event.pull_request.head.ref }}"
+          echo "PR base ref: ${{ github.event.pull_request.base.ref }}"
+          
+          # Try to get files via GitHub API
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "=== Fetching files via GitHub API ==="
+            curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                 "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+            jq -r '.[].filename' | head -20
+          fi
+          
+          echo "=== Raw event data ==="
+          echo '${{ toJSON(github.event) }}'
           echo "=== End Debug Info ==="
       - name: Check if should run
         run: |
