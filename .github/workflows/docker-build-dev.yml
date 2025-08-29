@@ -8,45 +8,37 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [develop]
-  push:
-    branches: [develop]
 
 jobs:
   build-main-amd64:
     runs-on: ubuntu-latest
     steps:
-      - name: Debug - Print PR files info
+      - name: Check PR files and determine execution
+        id: check_files
         run: |
-          echo "=== PR Files Debug Info ==="
-          echo "Event name: ${{ github.event_name }}"
-          echo "PR number: ${{ github.event.pull_request.number }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-main-amd64: Will run - workflow_dispatch"
+          fi
           
           # Get files via GitHub API
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "=== Fetching files via GitHub API ==="
-            FILES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                 "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
-            jq -r '.[].filename')
-            echo "$FILES"
-            
-            # Check if should run this job
-            if echo "$FILES" | grep -q "backend/" || \
-               echo "$FILES" | grep -q "sdk/" || \
-               echo "$FILES" | grep -q "make/main/" || \
-               [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-              echo "✅ build-main-amd64: Will run - conditions met"
-              echo "should_run=true" >> $GITHUB_OUTPUT
-            else
-              echo "❌ build-main-amd64: Will skip - conditions not met"
-              echo "should_run=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "✅ build-main-amd64: Will run - workflow_dispatch"
+          FILES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+          jq -r '.[].filename')
+          
+          # Check if should run this job
+          if echo "$FILES" | grep -q "backend/" || \
+             echo "$FILES" | grep -q "sdk/" || \
+             echo "$FILES" | grep -q "make/main/"; then
             echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-main-amd64: Will run - conditions met"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "✅ build-main-amd64: Will skip - conditions not met"
           fi
       
       - name: Set up Docker Buildx
-        if: steps.debug.outputs.should_run == 'true'
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
             docker buildx create --name nexent_builder --use
@@ -55,50 +47,43 @@ jobs:
           fi
       
       - name: Checkout code
-        if: steps.debug.outputs.should_run == 'true'
+        if: steps.check_files.outputs.should_run == 'true'
         uses: actions/checkout@v4
       
       - name: Build main image (amd64) and load locally
-        if: steps.debug.outputs.should_run == 'true'
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           docker buildx build --platform linux/amd64 -t nexent/nexent:dev-amd64 --load -f make/main/Dockerfile .
 
   build-main-arm64:
     runs-on: ubuntu-latest
     steps:
-      - name: Debug - Print PR files info
-        id: debug
+      - name: Check PR files and determine execution
+        id: check_files
         run: |
-          echo "=== PR Files Debug Info ==="
-          echo "Event name: ${{ github.event_name }}"
-          echo "PR number: ${{ github.event.pull_request.number }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-main-arm64: Will run - workflow_dispatch"
+          fi
           
           # Get files via GitHub API
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "=== Fetching files via GitHub API ==="
-            FILES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                 "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
-            jq -r '.[].filename')
-            echo "$FILES"
-            
-            # Check if should run this job
-            if echo "$FILES" | grep -q "backend/" || \
-               echo "$FILES" | grep -q "sdk/" || \
-               echo "$FILES" | grep -q "make/main/" || \
-               [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-              echo "✅ build-main-arm64: Will run - conditions met"
-              echo "should_run=true" >> $GITHUB_OUTPUT
-            else
-              echo "❌ build-main-arm64: Will skip - conditions not met"
-              echo "should_run=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "✅ build-main-arm64: Will run - workflow_dispatch"
+          FILES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+          jq -r '.[].filename')
+          
+          # Check if should run this job
+          if echo "$FILES" | grep -q "backend/" || \
+             echo "$FILES" | grep -q "sdk/" || \
+             echo "$FILES" | grep -q "make/main/"; then
             echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-main-arm64: Will run - conditions met"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "✅ build-main-arm64: Will skip - conditions not met"
           fi
       
       - name: Set up Docker Buildx
-        if: steps.debug.outputs.should_run == 'true'
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
             docker buildx create --name nexent_builder --use
@@ -107,148 +92,300 @@ jobs:
           fi
       
       - name: Checkout code
-        if: steps.debug.outputs.should_run == 'true'
+        if: steps.check_files.outputs.should_run == 'true'
         uses: actions/checkout@v4
       
       - name: Build main image (arm64) and load locally
-        if: steps.debug.outputs.should_run == 'true'
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
-          docker buildx build --platform linux/arm64 -t nexent/nexent:dev-arm64 --load -f make/terminal/Dockerfile .
+          docker buildx build --platform linux/arm64 -t nexent/nexent:dev-arm64 --load -f make/main/Dockerfile .
 
   build-data-process-amd64:
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.files.*.filename, 'backend/') ||
-      contains(github.event.pull_request.files.*.filename, 'sdk/') ||
-      contains(github.event.pull_request.files.*.filename, 'make/data_process/')
     steps:
+      - name: Check PR files and determine execution
+        id: check_files
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-data-process-amd64: Will run - workflow_dispatch"
+          fi
+          
+          # Get files via GitHub API
+          FILES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+          jq -r '.[].filename')
+          
+          # Check if should run this job
+          if echo "$FILES" | grep -q "backend/" || \
+             echo "$FILES" | grep -q "sdk/" || \
+             echo "$FILES" | grep -q "make/data_process/"; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-data-process-amd64: Will run - conditions met"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "✅ build-data-process-amd64: Will skip - conditions not met"
+          fi
+      
       - name: Free up disk space on GitHub runner
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+      
       - name: Set up Docker Buildx
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
             docker buildx create --name nexent_builder --use
           else
             docker buildx use nexent_builder
           fi
+      
       - name: Checkout code
+        if: steps.check_files.outputs.should_run == 'true'
         uses: actions/checkout@v4
+      
       - name: Clone model
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Nexent-AI/model-assets
           cd ./model-assets
           GIT_TRACE=1 GIT_CURL_VERBOSE=1 GIT_LFS_LOG=debug git lfs pull
           rm -rf .git .gitattributes
+      
       - name: Build data process image (amd64) and load locally
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           docker buildx build --platform linux/amd64 -t nexent/nexent-data-process:dev-amd64 --load -f make/data_process/Dockerfile .
 
   build-data-process-arm64:
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.files.*.filename, 'backend/') ||
-      contains(github.event.pull_request.files.*.filename, 'sdk/') ||
-      contains(github.event.pull_request.files.*.filename, 'make/data_process/')
     steps:
+      - name: Check PR files and determine execution
+        id: check_files
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-data-process-arm64: Will run - workflow_dispatch"
+          fi
+          
+          # Get files via GitHub API
+          FILES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+          jq -r '.[].filename')
+          
+          # Check if should run this job
+          if echo "$FILES" | grep -q "backend/" || \
+             echo "$FILES" | grep -q "sdk/" || \
+             echo "$FILES" | grep -q "make/data_process/"; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-data-process-arm64: Will run - conditions met"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "✅ build-data-process-arm64: Will skip - conditions not met"
+          fi
+      
       - name: Free up disk space on GitHub runner
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+      
       - name: Set up Docker Buildx
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
             docker buildx create --name nexent_builder --use
           else
             docker buildx use nexent_builder
           fi
+      
       - name: Checkout code
+        if: steps.check_files.outputs.should_run == 'true'
         uses: actions/checkout@v4
+      
       - name: Clone model
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Nexent-AI/model-assets
           cd ./model-assets
           GIT_TRACE=1 GIT_CURL_VERBOSE=1 GIT_LFS_LOG=debug git lfs pull
           rm -rf .git .gitattributes
+      
       - name: Build data process image (arm64) and load locally
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           docker buildx build --platform linux/arm64 -t nexent/nexent-data-process:dev-arm64 --load -f make/data_process/Dockerfile .
 
   build-web-amd64:
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.files.*.filename, 'frontend/') ||
-      contains(github.event.pull_request.files.*.filename, 'make/web/')
     steps:
+      - name: Check PR files and determine execution
+        id: check_files
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-web-amd64: Will run - workflow_dispatch"
+          fi
+          
+          # Get files via GitHub API
+          FILES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+          jq -r '.[].filename')
+          
+          # Check if should run this job
+          if echo "$FILES" | grep -q "frontend/" || \
+             echo "$FILES" | grep -q "make/web/"; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-web-amd64: Will run - conditions met"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "✅ build-web-amd64: Will skip - conditions not met"
+          fi
+      
       - name: Set up Docker Buildx
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
             docker buildx create --name nexent_builder --use
           else
             docker buildx use nexent_builder
           fi
+      
       - name: Checkout code
+        if: steps.check_files.outputs.should_run == 'true'
         uses: actions/checkout@v4
+      
       - name: Build web image (amd64) and load locally
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           docker buildx build --platform linux/amd64 -t nexent/nexent-web:dev-amd64 --load -f make/web/Dockerfile .
 
   build-web-arm64:
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.files.*.filename, 'frontend/') ||
-      contains(github.event.pull_request.files.*.filename, 'make/web/')
     steps:
+      - name: Check PR files and determine execution
+        id: check_files
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-web-arm64: Will run - workflow_dispatch"
+          fi
+          
+          # Get files via GitHub API
+          FILES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+          jq -r '.[].filename')
+          
+          # Check if should run this job
+          if echo "$FILES" | grep -q "frontend/" || \
+             echo "$FILES" | grep -q "make/web/"; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-web-arm64: Will run - conditions met"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "✅ build-web-arm64: Will skip - conditions not met"
+          fi
+      
       - name: Set up Docker Buildx
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
             docker buildx create --name nexent_builder --use
           else
             docker buildx use nexent_builder
           fi
+      
       - name: Checkout code
+        if: steps.check_files.outputs.should_run == 'true'
         uses: actions/checkout@v4
+      
       - name: Build web image (arm64) and load locally
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
-          docker buildx build --platform linux/amd64 -t nexent/nexent-web:dev-amd64 --load -f make/web/Dockerfile .
+          docker buildx build --platform linux/arm64 -t nexent/nexent-web:dev-arm64 --load -f make/web/Dockerfile .
 
   build-terminal-amd64:
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.files.*.filename, 'make/terminal/')
     steps:
+      - name: Check PR files and determine execution
+        id: check_files
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-terminal-amd64: Will run - workflow_dispatch"
+          fi
+          
+          # Get files via GitHub API
+          FILES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+          jq -r '.[].filename')
+          
+          # Check if should run this job
+          if echo "$FILES" | grep -q "make/terminal/"; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-terminal-amd64: Will run - conditions met"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "✅ build-terminal-amd64: Will skip - conditions not met"
+          fi
+      
       - name: Set up Docker Buildx
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
             docker buildx create --name nexent_builder --use
           else
             docker buildx use nexent_builder
           fi
+      
       - name: Checkout code
+        if: steps.check_files.outputs.should_run == 'true'
         uses: actions/checkout@v4
+      
       - name: Build terminal image (amd64) and load locally
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           docker buildx build --platform linux/amd64 -t nexent/nexent-ubuntu-terminal:dev-amd64 --load -f make/terminal/Dockerfile .
 
   build-terminal-arm64:
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.files.*.filename, 'make/terminal/')
     steps:
+      - name: Check PR files and determine execution
+        id: check_files
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-terminal-arm64: Will run - workflow_dispatch"
+          fi
+          
+          # Get files via GitHub API
+          FILES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+          jq -r '.[].filename')
+          
+          # Check if should run this job
+          if echo "$FILES" | grep -q "make/terminal/"; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ build-terminal-arm64: Will run - conditions met"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "✅ build-terminal-arm64: Will skip - conditions not met"
+          fi
+      
       - name: Set up Docker Buildx
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           if ! docker buildx inspect nexent_builder > /dev/null 2>&1; then
             docker buildx create --name nexent_builder --use
           else
             docker buildx use nexent_builder
           fi
+      
       - name: Checkout code
+        if: steps.check_files.outputs.should_run == 'true'
         uses: actions/checkout@v4
+      
       - name: Build terminal image (arm64) and load locally
+        if: steps.check_files.outputs.should_run == 'true'
         run: |
           docker buildx build --platform linux/arm64 -t nexent/nexent-ubuntu-terminal:dev-arm64 --load -f make/terminal/Dockerfile .
