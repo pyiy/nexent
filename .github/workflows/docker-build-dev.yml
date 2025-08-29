@@ -19,7 +19,6 @@ jobs:
         run: |
           echo "=== PR Files Debug Info ==="
           echo "Event name: ${{ github.event_name }}"
-          echo "PR files count: ${{ length(github.event.pull_request.files) }}"
           echo "=== File paths (what contains() checks) ==="
           echo '${{ toJSON(github.event.pull_request.files.*.filename) }}'
           echo "=== Full file objects ==="
