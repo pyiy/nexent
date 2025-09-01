@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { ModelType, SingleModelConfig } from '@/types/config'
 import { modelService } from '@/services/modelService'
 import { useConfig } from '@/hooks/useConfig'
-import { useModel } from '@/hooks/useModel'
+import { useModel } from '@/hooks/model/useSiliconModelList'
 import { useTranslation } from 'react-i18next'
 
 const { Option } = Select
