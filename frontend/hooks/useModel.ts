@@ -47,12 +47,12 @@ export function useModel({
         message.error(t('model.dialog.error.noModelsFetched'));
       }
       const selectedModels = await getProviderSelectedModalList() || [];
-      // 关键逻辑
+      // Key logic
       if (!selectedModels.length) {
-        // 全部不选
+        // Select none
         setSelectedModelIds(new Set());
       } else {
-        // 只选中 selectedModels
+        // Only select selectedModels
         setSelectedModelIds(new Set(selectedModels.map((m: any) => m.id)));
       }
     } catch (error) {
