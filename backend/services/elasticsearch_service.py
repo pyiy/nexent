@@ -26,7 +26,7 @@ from nexent.vector_database.elasticsearch_core import ElasticSearchCore
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
-from consts.const import ES_API_KEY, ES_HOST
+from consts.const import ES_API_KEY, ES_HOST, MODEL_CONFIG
 from database.attachment_db import delete_file
 from database.knowledge_db import (
     create_knowledge_record,
@@ -120,7 +120,7 @@ def get_es_core():
 def get_embedding_model(tenant_id: str):
     # Get the tenant config
     model_config = tenant_config_manager.get_model_config(
-        key="EMBEDDING_ID", tenant_id=tenant_id)
+        key=MODEL_CONFIG["EMBEDDING"], tenant_id=tenant_id)
 
     model_type = model_config.get("model_type", "")
 

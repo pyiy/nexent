@@ -18,6 +18,7 @@ from database.tool_db import search_tools_for_sub_agent
 from utils.prompt_template_utils import get_agent_prompt_template
 from utils.config_utils import config_manager, tenant_config_manager, get_model_name_from_config
 from utils.auth_utils import get_current_user_id
+from consts.const import APP_CONFIG, MODEL_CONFIG
 
 logger = logging.getLogger("create_agent_info")
 logger.setLevel(logging.DEBUG)
@@ -25,9 +26,9 @@ logger.setLevel(logging.DEBUG)
 
 async def create_model_config_list(tenant_id):
     main_model_config = tenant_config_manager.get_model_config(
-        key="LLM_ID", tenant_id=tenant_id)
+        key=MODEL_CONFIG["LLM"], tenant_id=tenant_id)
     sub_model_config = tenant_config_manager.get_model_config(
-        key="LLM_SECONDARY_ID", tenant_id=tenant_id)
+        key=MODEL_CONFIG["LLM_SECONDARY"], tenant_id=tenant_id)
 
     return [ModelConfig(cite_name="main_model",
                         api_key=main_model_config.get("api_key", ""),
@@ -135,8 +136,8 @@ async def create_agent_config(agent_id, tenant_id, user_id, language: str = 'zh'
             "tools": {tool.name: tool for tool in tool_list},
             "managed_agents": {agent.name: agent for agent in managed_agents},
             "authorized_imports": str(BASE_BUILTIN_MODULES),
-            "APP_NAME": app_name,
-            "APP_DESCRIPTION": app_description,
+            APP_CONFIG["APP_NAME"]: app_name,
+            APP_CONFIG["APP_DESCRIPTION"]: app_description,
             "memory_list": memory_list,
             "knowledge_base_summary": knowledge_base_summary,
             "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")

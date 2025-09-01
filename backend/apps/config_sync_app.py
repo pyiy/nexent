@@ -9,7 +9,10 @@ from consts.const import (
     DEFAULT_APP_DESCRIPTION_EN,
     DEFAULT_APP_NAME_EN,
     DEFAULT_APP_NAME_ZH,
-    DEFAULT_APP_ICON_URL
+    DEFAULT_APP_ICON_URL,
+    APP_CONFIG,
+    MODEL_CONFIG,
+    MODEL_TYPE
 )
 from consts.model import GlobalConfig
 from database.model_management_db import get_model_id_by_display_name
@@ -154,36 +157,36 @@ async def load_config(authorization: Optional[str] = Header(None), request: Requ
             authorization, request)
 
         llm_model_name = tenant_config_manager.get_model_config(
-            "LLM_ID", tenant_id=tenant_id)
+            MODEL_CONFIG["LLM"], tenant_id=tenant_id)
         llm_secondary_model_name = tenant_config_manager.get_model_config(
-            "LLM_SECONDARY_ID", tenant_id=tenant_id)
+            MODEL_CONFIG["LLM_SECONDARY"], tenant_id=tenant_id)
         embedding_model_name = tenant_config_manager.get_model_config(
-            "EMBEDDING_ID", tenant_id=tenant_id)
+            MODEL_CONFIG["EMBEDDING"], tenant_id=tenant_id)
         multi_embedding_model_name = tenant_config_manager.get_model_config(
-            "MULTI_EMBEDDING_ID", tenant_id=tenant_id)
+            MODEL_CONFIG["MULTI_EMBEDDING"], tenant_id=tenant_id)
         rerank_model_name = tenant_config_manager.get_model_config(
-            "RERANK_ID", tenant_id=tenant_id)
+            MODEL_CONFIG["RERANK"], tenant_id=tenant_id)
         vlm_model_name = tenant_config_manager.get_model_config(
-            "VLM_ID", tenant_id=tenant_id)
+            MODEL_CONFIG["VLM"], tenant_id=tenant_id)
         stt_model_name = tenant_config_manager.get_model_config(
-            "STT_ID", tenant_id=tenant_id)
+            MODEL_CONFIG["STT"], tenant_id=tenant_id)
         tts_model_name = tenant_config_manager.get_model_config(
-            "TTS_ID", tenant_id=tenant_id)
+            MODEL_CONFIG["TTS"], tenant_id=tenant_id)
 
         default_app_name = DEFAULT_APP_NAME_ZH if language == "zh" else DEFAULT_APP_NAME_EN
         default_app_description = DEFAULT_APP_DESCRIPTION_ZH if language == "zh" else DEFAULT_APP_DESCRIPTION_EN
         config = {
             "app": {
-                "name": tenant_config_manager.get_app_config("APP_NAME", tenant_id=tenant_id) or default_app_name,
-                "description": tenant_config_manager.get_app_config("APP_DESCRIPTION", tenant_id=tenant_id) or default_app_description,
+                "name": tenant_config_manager.get_app_config(APP_CONFIG["APP_NAME"], tenant_id=tenant_id) or default_app_name,
+                "description": tenant_config_manager.get_app_config(APP_CONFIG["APP_DESCRIPTION"], tenant_id=tenant_id) or default_app_description,
                 "icon": {
-                    "type": tenant_config_manager.get_app_config("ICON_TYPE", tenant_id=tenant_id) or "preset",
-                    "avatarUri": tenant_config_manager.get_app_config("AVATAR_URI", tenant_id=tenant_id) or DEFAULT_APP_ICON_URL,
-                    "customUrl": tenant_config_manager.get_app_config("CUSTOM_ICON_URL", tenant_id=tenant_id) or ""
+                    "type": tenant_config_manager.get_app_config(APP_CONFIG["ICON_TYPE"], tenant_id=tenant_id) or "preset",
+                    "avatarUri": tenant_config_manager.get_app_config(APP_CONFIG["AVATAR_URI"], tenant_id=tenant_id) or DEFAULT_APP_ICON_URL,
+                    "customUrl": tenant_config_manager.get_app_config(APP_CONFIG["CUSTOM_ICON_URL"], tenant_id=tenant_id) or ""
                 }
             },
             "models": {
-                "llm": {
+                MODEL_TYPE["LLM"]: {
                     "name": get_model_name_from_config(llm_model_name) if llm_model_name else "",
                     "displayName": llm_model_name.get("display_name", ""),
                     "apiConfig": {
@@ -191,7 +194,7 @@ async def load_config(authorization: Optional[str] = Header(None), request: Requ
                         "modelUrl": llm_model_name.get("base_url", "")
                     }
                 },
-                "llmSecondary": {
+                MODEL_TYPE["LLM_SECONDARY"]: {
                     "name": get_model_name_from_config(llm_secondary_model_name) if llm_secondary_model_name else "",
                     "displayName": llm_secondary_model_name.get("display_name", ""),
                     "apiConfig": {
@@ -199,7 +202,7 @@ async def load_config(authorization: Optional[str] = Header(None), request: Requ
                         "modelUrl": llm_secondary_model_name.get("base_url", "")
                     }
                 },
-                "embedding": {
+                MODEL_TYPE["EMBEDDING"]: {
                     "name": get_model_name_from_config(embedding_model_name) if embedding_model_name else "",
                     "displayName": embedding_model_name.get("display_name", ""),
                     "apiConfig": {
@@ -208,7 +211,7 @@ async def load_config(authorization: Optional[str] = Header(None), request: Requ
                     },
                     "dimension": embedding_model_name.get("max_tokens", 0)
                 },
-                "multiEmbedding": {
+                MODEL_TYPE["MULTI_EMBEDDING"]: {
                     "name": get_model_name_from_config(multi_embedding_model_name) if multi_embedding_model_name else "",
                     "displayName": multi_embedding_model_name.get("display_name", ""),
                     "apiConfig": {
@@ -217,7 +220,7 @@ async def load_config(authorization: Optional[str] = Header(None), request: Requ
                     },
                     "dimension": multi_embedding_model_name.get("max_tokens", 0)
                 },
-                "rerank": {
+                MODEL_TYPE["RERANK"]: {
                     "name": get_model_name_from_config(rerank_model_name) if rerank_model_name else "",
                     "displayName": rerank_model_name.get("display_name", ""),
                     "apiConfig": {
@@ -225,7 +228,7 @@ async def load_config(authorization: Optional[str] = Header(None), request: Requ
                         "modelUrl": rerank_model_name.get("base_url", "")
                     }
                 },
-                "vlm": {
+                MODEL_TYPE["VLM"]: {
                     "name": get_model_name_from_config(vlm_model_name) if vlm_model_name else "",
                     "displayName": vlm_model_name.get("display_name", ""),
                     "apiConfig": {
@@ -233,7 +236,7 @@ async def load_config(authorization: Optional[str] = Header(None), request: Requ
                         "modelUrl": vlm_model_name.get("base_url", "")
                     }
                 },
-                "stt": {
+                MODEL_TYPE["STT"]: {
                     "name": get_model_name_from_config(stt_model_name) if stt_model_name else "",
                     "displayName": stt_model_name.get("display_name", ""),
                     "apiConfig": {
@@ -241,7 +244,7 @@ async def load_config(authorization: Optional[str] = Header(None), request: Requ
                         "modelUrl": stt_model_name.get("base_url", "")
                     }
                 },
-                "tts": {
+                MODEL_TYPE["TTS"]: {
                     "name": get_model_name_from_config(tts_model_name) if tts_model_name else "",
                     "displayName": tts_model_name.get("display_name", ""),
                     "apiConfig": {

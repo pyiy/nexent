@@ -3,6 +3,7 @@ from typing import Union, BinaryIO
 
 from utils.config_utils import tenant_config_manager, get_model_name_from_config
 from utils.prompt_template_utils import get_analyze_file_prompt_template
+from consts.const import MODEL_CONFIG
 from jinja2 import Template, StrictUndefined
 
 from nexent.core.models.openai_vlm import OpenAIVLModel
@@ -24,7 +25,7 @@ def convert_image_to_text(query: str, image_input: Union[str, BinaryIO], tenant_
     Returns:
         str: Image description text
     """
-    vlm_model_config = tenant_config_manager.get_model_config(key="VLM_ID", tenant_id=tenant_id)
+    vlm_model_config = tenant_config_manager.get_model_config(key=MODEL_CONFIG["VLM"], tenant_id=tenant_id)
     image_to_text_model = OpenAIVLModel(
         observer=MessageObserver(),
         model_id=get_model_name_from_config(vlm_model_config) if vlm_model_config else "",
@@ -56,7 +57,7 @@ def convert_long_text_to_text(query: str, file_context: str, tenant_id: str, lan
     Returns:
         str: Summarized text description
     """
-    secondary_model_config = tenant_config_manager.get_model_config("LLM_SECONDARY_ID", tenant_id=tenant_id)
+    secondary_model_config = tenant_config_manager.get_model_config(MODEL_CONFIG["LLM_SECONDARY"], tenant_id=tenant_id)
     long_text_to_text_model = OpenAILongContextModel(
         observer=MessageObserver(),
         model_id=get_model_name_from_config(secondary_model_config),

@@ -146,3 +146,45 @@ DISABLE_AGENT_ID_KEY = "DISABLE_AGENT_ID"
 DISABLE_USERAGENT_ID_KEY = "DISABLE_USERAGENT_ID"
 DEFAULT_MEMORY_SWITCH_KEY = "Y"
 DEFAULT_MEMORY_AGENT_SHARE_KEY = "always"
+
+# App Config
+APP_CONFIG = {
+    "APP_NAME": "APP_NAME",
+    "APP_DESCRIPTION": "APP_DESCRIPTION",
+    "ICON_URL": "ICON_URL",
+    "AVATAR_URI": "AVATAR_URI",
+    "CUSTOM_ICON_URL": "CUSTOM_ICON_URL"
+}
+
+# Model Config
+MODEL_CONFIG = {
+    "LLM": "LLM_ID",
+    "LLM_SECONDARY": "LLM_SECONDARY_ID",
+    "EMBEDDING": "EMBEDDING_ID",
+    "MULTI_EMBEDDING": "MULTI_EMBEDDING_ID",
+    "RERANK": "RERANK_ID",
+    "VLM": "VLM_ID",
+    "STT": "STT_ID",
+    "TTS": "TTS_ID"
+}
+
+MODEL_TYPE = {
+    "LLM": "llm",
+    "LLM_SECONDARY": "llmSecondary",
+    "EMBEDDING": "embedding",
+    "MULTI_EMBEDDING": "multiEmbedding",
+    "RERANK": "rerank",
+    "VLM": "vlm",
+    "STT": "stt",
+    "TTS": "tts"
+}
+
+DATA_PROCESS_STATUS = {
+    "ENABLED": "ENABLED",
+    "DISABLED": "DISABLED"
+}
+
+DATA_PROCESS_TYPE = {
+    "IMAGE": "IMAGE",
+    "VIDEO": "VIDEO",
+}

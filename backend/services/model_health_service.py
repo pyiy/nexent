@@ -9,7 +9,7 @@ from utils.auth_utils import get_current_user_id
 from utils.config_utils import get_model_name_from_config
 
 from apps.voice_app import VoiceService
-from consts.const import MODEL_ENGINE_APIKEY, MODEL_ENGINE_HOST
+from consts.const import MODEL_ENGINE_APIKEY, MODEL_ENGINE_HOST, MODEL_TYPE
 from consts.model import ModelConnectStatusEnum, ModelResponse
 from database.model_management_db import get_model_by_display_name, update_model_record
 
@@ -23,7 +23,7 @@ async def _embedding_dimension_check(
     model_api_key: str):
 
     # Test connectivity based on different model types
-    if model_type == "embedding":
+    if model_type == MODEL_TYPE["EMBEDDING"]:
         embedding =await OpenAICompatibleEmbedding(
             model_name=model_name, 
             base_url=model_base_url, 
@@ -32,7 +32,7 @@ async def _embedding_dimension_check(
         ).dimension_check()
         if len(embedding)>0:
             return len(embedding[0])
-    elif model_type == "multi_embedding":
+    elif model_type == MODEL_TYPE["MULTI_EMBEDDING"]:
         embedding =await JinaEmbedding(
             model_name=model_name, 
             base_url=model_base_url, 
@@ -69,21 +69,21 @@ async def _perform_connectivity_check(
     connectivity: bool
     
     # Test connectivity based on different model types
-    if model_type == "embedding":
+    if model_type == MODEL_TYPE["EMBEDDING"]:
         connectivity = len(await OpenAICompatibleEmbedding(
             model_name=model_name, 
             base_url=model_base_url, 
             api_key=model_api_key, 
             embedding_dim=embedding_dim
         ).dimension_check()) > 0
-    elif model_type == "multi_embedding":
+    elif model_type == MODEL_TYPE["MULTI_EMBEDDING"]:
         connectivity = len(await JinaEmbedding(
             model_name=model_name, 
             base_url=model_base_url, 
             api_key=model_api_key, 
             embedding_dim=embedding_dim
         ).dimension_check()) > 0
-    elif model_type == "llm":
+    elif model_type == MODEL_TYPE["LLM"]:
         observer = MessageObserver()
         connectivity = await OpenAIModel(
             observer, 
@@ -91,9 +91,9 @@ async def _perform_connectivity_check(
             api_base=model_base_url, 
             api_key=model_api_key
         ).check_connectivity()
-    elif model_type == "rerank":
+    elif model_type == MODEL_TYPE["RERANK"]:
         connectivity = False
-    elif model_type == "vlm":
+    elif model_type == MODEL_TYPE["VLM"]:
         observer = MessageObserver()
         connectivity =await OpenAIVLModel(
             observer, 
@@ -101,7 +101,7 @@ async def _perform_connectivity_check(
             api_base=model_base_url, 
             api_key=model_api_key
         ).check_connectivity()
-    elif model_type in ["tts", "stt"]:
+    elif model_type in [MODEL_TYPE["TTS"], MODEL_TYPE["STT"]]:
         connectivity = await VoiceService().check_connectivity(model_type)
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
@@ -179,14 +179,14 @@ async def check_me_model_connectivity(model_name: str):
             model_type = model_data['type']
 
             # Test model based on type
-            if model_type == 'llm':
+            if model_type == MODEL_TYPE["LLM"]:
                 payload = {"model": model_name, "messages": [{"role": "user", "content": "hello"}]}
                 api_response = await client.post(
                     f"{MODEL_ENGINE_HOST}/open/router/v1/chat/completions",
                     headers=headers,
                     json=payload
                 )
-            elif model_type == 'embedding':
+            elif model_type == MODEL_TYPE["EMBEDDING"]:
                 payload = {"model": model_name, "input": "Hello"}
                 api_response = await client.post(
                     f"{MODEL_ENGINE_HOST}/open/router/v1/embeddings",
