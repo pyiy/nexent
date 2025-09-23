@@ -1228,9 +1228,9 @@ export function ChatInput({
 
       {/* Chat input part */}
       {isInitialMode ? (
-        <div className="flex flex-col items-center justify-center h-full w-full max-w-5xl mx-auto mt-[-80px]">
-          <div className="flex flex-col items-center mb-4">
-            <div className="flex items-center mb-6">
+        <div className="flex flex-col items-center justify-center h-full w-full max-w-4xl mx-auto mt-[-80px] px-4">
+          <div className="flex flex-col items-center mb-8">
+            <div className="flex items-center mb-8">
               <div className="h-16 w-16 rounded-full overflow-hidden mr-4">
                 <img
                   src={avatarUrl}
@@ -1254,13 +1254,13 @@ export function ChatInput({
                 {t("chatInput.helloIm", { appName: appConfig.appName })}
               </h1>
             </div>
-            <p className="h-6 text-center text-muted-foreground">
+            <p className="text-center text-muted-foreground max-w-2xl mx-auto leading-relaxed text-sm">
               {t("chatInput.introMessage")}
             </p>
           </div>
           <div
             ref={dropAreaRef}
-            className="relative w-full max-w-4xl rounded-3xl shadow-sm border border-slate-200 bg-slate-100 overflow-hidden"
+            className="relative w-full max-w-3xl rounded-3xl shadow-sm border border-slate-200 bg-slate-100 overflow-hidden"
           >
             {renderInputArea()}
           </div>
