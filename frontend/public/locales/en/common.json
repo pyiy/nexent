@@ -90,7 +90,7 @@
   "chatInput.recording": "Recording...",
   "chatInput.recordingError": "Recording error, please try again",
   "chatInput.helloIm": "Hello, I'm {{appName}}",
-  "chatInput.introMessage": "I can help you with coding, reading, searching, and comprehensive tasks. Feel free to ask!",
+  "chatInput.introMessage": "Nexent is an open-source agent SDK and platform that transforms single prompts into complete multimodal services. Built on the MCP tool ecosystem, it provides flexible model integration, scalable data processing, and powerful knowledge base management. Making daily workflows smarter and more connected.",
   "chatInput.close": "Close",
   "chatInput.send": "Send",
   "chatInput.remove": "Remove",
