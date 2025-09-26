@@ -140,7 +140,7 @@ backend/
 - Streaming responses and real-time communication
 - Complete documentation and SDK support
 
-> **Note**: The Northbound API serves as an independent service module. For detailed documentation, please refer to [Northbound API Documentation](../northbound/README.md)
+> **Note**: The Northbound API serves as an independent service module. For detailed documentation, please refer to [Northbound API Documentation](../northbound/)
 
 ## Data Flow Architecture
 
