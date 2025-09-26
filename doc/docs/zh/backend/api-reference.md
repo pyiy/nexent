@@ -14,6 +14,50 @@
 9. [代理应用](#代理应用)
 10. [文件管理应用](#文件管理应用)
 11. [语音应用](#语音应用)
+12. [北向接口](#北向接口)
+
+## 北向接口
+
+北向接口（Northbound API）是 Nexent 平台为合作伙伴提供的标准化 API 接口，支持智能体对话、会话管理、智能体查询等核心功能。
+
+### 相关文档
+
+- [北向接口完整文档](../northbound/northbound-api.md) - 详细的接口说明、认证机制、参数说明和最佳实践
+- [北向接口快速开始](../northbound/northbound-quickstart.md) - 5分钟快速上手指南
+- [北向接口架构说明](../northbound/northbound-architecture.md) - 技术架构和实现细节
+
+### 主要功能
+
+- **智能体对话**: 支持流式对话，实时返回智能体响应
+- **会话管理**: 创建、查询、更新会话信息
+- **智能体查询**: 获取可用的智能体列表
+- **安全认证**: 双重认证机制（JWT + AK/SK 签名）
+- **幂等性控制**: 防止重复操作
+- **频率限制**: 防止滥用和攻击
+
+### 基础信息
+
+- **基础路径**: `/api/nb/v1`
+- **协议**: HTTPS（生产环境）
+- **数据格式**: JSON
+- **流式响应**: Server-Sent Events (SSE)
+- **认证方式**: JWT Token + AK/SK 签名
+
+### 快速开始
+
+```bash
+# 健康检查
+curl -X GET "https://api.example.com/api/nb/v1/health"
+
+# 获取智能体列表
+curl -X GET "https://api.example.com/api/nb/v1/agents" \
+  -H "Authorization: Bearer your_jwt_token" \
+  -H "X-Access-Key: your_access_key" \
+  -H "X-Timestamp: 1640995200" \
+  -H "X-Signature: your_signature"
+```
+
+更多详细信息请参考 [北向接口完整文档](../northbound/northbound-api.md)。
 
 ## 基础应用
 

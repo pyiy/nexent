@@ -1,7 +1,8 @@
 ﻿import { defineConfig } from 'vitepress'
+import { withMermaid } from 'vitepress-plugin-mermaid'
 
 // https://vitepress.dev/reference/site-config
-export default defineConfig({
+export default withMermaid(defineConfig({
   base: '/doc/',
   title: "Nexent Doc",
   description: "A zero-code platform for auto-generating agents  no orchestration, no complex drag-and-drop required.",
@@ -102,6 +103,15 @@ export default defineConfig({
                 ]
               },
               { text: 'Prompt Development', link: '/en/backend/prompt-development' }
+            ]
+          },
+          {
+            text: 'Northbound API',
+            items: [
+              { text: 'Northbound API Overview', link: '/en/northbound/' },
+              { text: 'Quick Start', link: '/en/northbound/northbound-quickstart' },
+              { text: 'API Documentation', link: '/en/northbound/northbound-api' },
+              { text: 'Architecture Guide', link: '/en/northbound/northbound-architecture' }
             ]
           },
           {
@@ -233,6 +243,15 @@ export default defineConfig({
             ]
           },
           {
+            text: '北向接口',
+            items: [
+              { text: '北向接口概览', link: '/zh/northbound/' },
+              { text: '快速开始', link: '/zh/northbound/northbound-quickstart' },
+              { text: '接口文档', link: '/zh/northbound/northbound-api' },
+              { text: '架构说明', link: '/zh/northbound/northbound-architecture' }
+            ]
+          },
+          {
             text: '文档开发',
             items: [
               { text: '文档开发指南', link: '/zh/docs-development' }
@@ -286,5 +305,19 @@ export default defineConfig({
     socialLinks: [
       { icon: 'github', link: 'https://github.com/ModelEngine-Group/nexent' }
     ]
+  },
+
+  // Mermaid configuration
+  mermaid: {
+    // Mermaid configuration options
+    theme: 'default',
+    themeVariables: {
+      primaryColor: '#3b82f6',
+      primaryTextColor: '#1f2937',
+      primaryBorderColor: '#d1d5db',
+      lineColor: '#6b7280',
+      secondaryColor: '#f3f4f6',
+      tertiaryColor: '#ffffff'
+    }
   }
-})
+}))
