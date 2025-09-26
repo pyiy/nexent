@@ -133,6 +133,15 @@ backend/
 - Load balancing and caching
 - Performance optimization
 
+### Northbound API
+- Standardized API for partners
+- Agent conversations and session management
+- Dual authentication mechanism (JWT + AK/SK)
+- Streaming responses and real-time communication
+- Complete documentation and SDK support
+
+> **Note**: The Northbound API serves as an independent service module. For detailed documentation, please refer to [Northbound API Documentation](../northbound/README.md)
+
 ## Data Flow Architecture
 
 ### 1. User Request Flow

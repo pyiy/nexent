@@ -14,6 +14,7 @@ This document provides a comprehensive overview of all API endpoints available i
 9. [Proxy App](#proxy-app)
 10. [File Management App](#file-management-app)
 11. [Voice App](#voice-app)
+12. [Northbound API](#northbound-api)
 
 ## Base App
 
@@ -1176,3 +1177,46 @@ The apps have the following dependencies:
     - STT model
     - TTS model
     - WebSocket support
+
+## Northbound API
+
+The Northbound API provides standardized API interfaces for partners, supporting core functions such as agent conversations, session management, and agent queries.
+
+### Related Documentation
+
+- [Northbound API Complete Documentation](../northbound/northbound-api.md) - Detailed interface descriptions, authentication mechanisms, parameter specifications, and best practices
+- [Northbound API Quick Start](../northbound/northbound-quickstart.md) - 5-minute quick start guide
+- [Northbound API Architecture Guide](../northbound/northbound-architecture.md) - Technical architecture and implementation details
+
+### Main Features
+
+- **Agent Conversations**: Support for streaming conversations with real-time agent responses
+- **Session Management**: Create, query, and update session information
+- **Agent Queries**: Get available agent lists
+- **Security Authentication**: Dual authentication mechanism (JWT + AK/SK signature)
+- **Idempotency Control**: Prevent duplicate operations
+- **Rate Limiting**: Prevent abuse and attacks
+
+### Basic Information
+
+- **Base Path**: `/api/nb/v1`
+- **Protocol**: HTTPS (production environment)
+- **Data Format**: JSON
+- **Streaming Response**: Server-Sent Events (SSE)
+- **Authentication**: JWT Token + AK/SK signature
+
+### Quick Start
+
+```bash
+# Health check
+curl -X GET "https://api.example.com/api/nb/v1/health"
+
+# Get agent list
+curl -X GET "https://api.example.com/api/nb/v1/agents" \
+  -H "Authorization: Bearer your_jwt_token" \
+  -H "X-Access-Key: your_access_key" \
+  -H "X-Timestamp: 1640995200" \
+  -H "X-Signature: your_signature"
+```
+
+For more detailed information, please refer to [Northbound API Complete Documentation](../northbound/northbound-api.md).
