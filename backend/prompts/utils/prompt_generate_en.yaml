@@ -218,6 +218,26 @@ AGENT_VARIABLE_NAME_SYSTEM_PROMPT: |-
   web_search_assistant
 
 
+AGENT_VARIABLE_NAME_REGENERATE_SYSTEM_PROMPT: |-
+  ### De-duplication Constraints:
+  1. Keep the meaning aligned with "{original_name}" so that the responsibilities remain clear.
+  2. Never output any of the existing variable names: {existing_names}.
+  3. Follow the variable naming rules and leverage the task description when helpful.
+
+
+AGENT_VARIABLE_NAME_REGENERATE_USER_PROMPT: |-
+  ### Task Description:
+  {task_description}
+  
+  ### Original Variable Name:
+  {original_name}
+  
+  ### Existing Variable Names:
+  {existing_names}
+  
+  Please generate a new agent variable name that keeps the same meaning but does not duplicate the existing names.
+
+
 AGENT_DESCRIPTION_SYSTEM_PROMPT: |-
   ### You are an [Agent Description Generation Expert], used to help users generate agent descriptions.
   You are currently building an Agent application. User input contains three parts: task description, tools used, and assistants used.
@@ -233,6 +253,26 @@ AGENT_DESCRIPTION_SYSTEM_PROMPT: |-
 
   Example 2:
   You are a web search assistant that can search for corresponding information based on user questions and provide search results.
+
+
+AGENT_DISPLAY_NAME_REGENERATE_SYSTEM_PROMPT: |-
+  ### De-duplication Constraints:
+  1. Keep the semantics consistent with "{original_display_name}".
+  2. Do not output any of the existing display names: {existing_display_names}.
+  3. Ensure the display name is concise, readable, and language-compliant.
+
+
+AGENT_DISPLAY_NAME_REGENERATE_USER_PROMPT: |-
+  ### Task Description:
+  {task_description}
+  
+  ### Original Display Name:
+  {original_display_name}
+  
+  ### Existing Display Names:
+  {existing_display_names}
+  
+  Please generate a new agent display name with the same meaning that does not duplicate any existing display names.
 
 
 USER_PROMPT: |-

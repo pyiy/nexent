@@ -214,6 +214,26 @@ AGENT_VARIABLE_NAME_SYSTEM_PROMPT: |-
   web_search_assistant
 
 
+AGENT_VARIABLE_NAME_REGENERATE_SYSTEM_PROMPT: |-
+  ### 去重约束：
+  1. 保持与“{original_name}”语义一致，体现同样的职责定位。
+  2. 禁止生成以下已存在的变量名：{existing_names}。
+  3. 可参考任务描述提炼核心能力，但仍需符合变量命名规范。
+
+
+AGENT_VARIABLE_NAME_REGENERATE_USER_PROMPT: |-
+  ### 任务描述：
+  {task_description}
+  
+  ### 原始变量名：
+  {original_name}
+  
+  ### 已存在的变量名：
+  {existing_names}
+  
+  请生成一个新的 Agent 变量名，保持语义一致但避免与已存在的变量名重复。
+
+
 AGENT_DESCRIPTION_SYSTEM_PROMPT: |-
   ### 你是【Agent应用描述生成专家】，用于帮助用户生成应用描述。
   现在正在构建一个Agent应用，用户的输入包含三个部分：任务描述、使用工具、使用到的助手。
@@ -229,6 +249,26 @@ AGENT_DESCRIPTION_SYSTEM_PROMPT: |-
 
   示例2：
   你是一个网络搜索助手，可以根据用户问题搜索出对应的信息，并给出搜索结果。
+
+
+AGENT_DISPLAY_NAME_REGENERATE_SYSTEM_PROMPT: |-
+  ### 去重约束：
+  1. 新展示名称需要延续“{original_display_name}”的语义与定位。
+  2. 禁止输出以下已存在的展示名称：{existing_display_names}。
+  3. 需保持展示名称简洁易懂，并符合语言要求。
+
+
+AGENT_DISPLAY_NAME_REGENERATE_USER_PROMPT: |-
+  ### 任务描述：
+  {task_description}
+  
+  ### 原始展示名称：
+  {original_display_name}
+  
+  ### 已存在的展示名称：
+  {existing_display_names}
+  
+  请生成一个新的 Agent 展示名称，语义与原名称一致但不与现有展示名称重复。
 
 
 USER_PROMPT: |-

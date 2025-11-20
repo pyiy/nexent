@@ -8,7 +8,7 @@ from smolagents import OpenAIServerModel
 
 from consts.const import LANGUAGE, MODEL_CONFIG_MAPPING, MESSAGE_ROLE, THINK_END_PATTERN, THINK_START_PATTERN
 from consts.model import AgentInfoRequest
-from database.agent_db import update_agent, query_sub_agents_id_list, search_agent_info_by_agent_id
+from database.agent_db import update_agent, query_sub_agents_id_list, search_agent_info_by_agent_id, query_all_agent_info_by_tenant_id
 from database.model_management_db import get_model_by_model_id
 from database.tool_db import query_tools_by_ids
 from services.agent_service import get_enable_tool_id_by_agent_id
@@ -143,14 +143,101 @@ def generate_and_save_system_prompt_impl(agent_id: int,
     else:
         logger.info(
             "Updating agent with business_description and prompt segments")
+        
+        # Check for duplicate names and regenerate if needed
+        agent_name = final_results["agent_var_name"]
+        agent_display_name = final_results["agent_display_name"]
+        
+        # Import functions locally to avoid circular import
+        from services.agent_service import (
+            _check_agent_param_duplicate,
+            _regenerate_agent_name_with_llm,
+            _regenerate_agent_display_name_with_llm,
+            _generate_unique_agent_name_with_suffix,
+            _generate_unique_display_name_with_suffix
+        )
+        
+        # Get all existing agent names and display names for duplicate checking
+        all_agents = query_all_agent_info_by_tenant_id(tenant_id)
+        existing_names = {
+            agent.get("name")
+            for agent in all_agents
+            if agent.get("name") and agent.get("agent_id") != agent_id
+        }
+        existing_display_names = {
+            agent.get("display_name")
+            for agent in all_agents
+            if agent.get("display_name") and agent.get("agent_id") != agent_id
+        }
+        
+        # Check and regenerate name if duplicate
+        if _check_agent_param_duplicate(
+            agent_name,
+            existing_agents=all_agents,
+            exclude_agent_id=agent_id
+        ):
+            logger.info(f"Agent name '{agent_name}' already exists, regenerating with LLM")
+            try:
+                agent_name = _regenerate_agent_name_with_llm(
+                    original_name=agent_name,
+                    existing_names=existing_names,
+                    task_description=task_description,
+                    model_id=model_id,
+                    tenant_id=tenant_id,
+                    language=language
+                )
+                logger.info(f"Regenerated agent name: '{agent_name}'")
+            except Exception as e:
+                logger.error(f"Failed to regenerate agent name with LLM: {str(e)}, using fallback")
+                # Fallback: add suffix
+                agent_name = _generate_unique_agent_name_with_suffix(
+                    agent_name,
+                    existing_names=existing_names,
+                    existing_agents=all_agents,
+                    exclude_agent_id=agent_id
+                )
+        
+        # Check and regenerate display_name if duplicate
+        if _check_agent_param_duplicate(
+            agent_display_name,
+            check_param="display_name",
+            existing_agents=all_agents,
+            exclude_agent_id=agent_id
+        ):
+            logger.info(f"Agent display_name '{agent_display_name}' already exists, regenerating with LLM")
+            try:
+                agent_display_name = _regenerate_agent_display_name_with_llm(
+                    original_display_name=agent_display_name,
+                    existing_display_names=existing_display_names,
+                    task_description=task_description,
+                    model_id=model_id,
+                    tenant_id=tenant_id,
+                    language=language
+                )
+                logger.info(f"Regenerated agent display_name: '{agent_display_name}'")
+            except Exception as e:
+                logger.error(f"Failed to regenerate agent display_name with LLM: {str(e)}, using fallback")
+                # Fallback: add suffix
+                agent_display_name = _generate_unique_display_name_with_suffix(
+                    agent_display_name,
+                    existing_display_names=existing_display_names,
+                    existing_agents=all_agents,
+                    exclude_agent_id=agent_id
+                )
+
+        if agent_name:
+            existing_names.add(agent_name)
+        if agent_display_name:
+            existing_display_names.add(agent_display_name)
+        
         agent_info = AgentInfoRequest(
             agent_id=agent_id,
             business_description=task_description,
             duty_prompt=final_results["duty"],
             constraint_prompt=final_results["constraint"],
             few_shots_prompt=final_results["few_shots"],
-            name=final_results["agent_var_name"],
-            display_name=final_results["agent_display_name"],
+            name=agent_name,
+            display_name=agent_display_name,
             description=final_results["agent_description"]
         )
         update_agent(
