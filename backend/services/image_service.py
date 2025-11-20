@@ -4,6 +4,11 @@ from http import HTTPStatus
 import aiohttp
 
 from consts.const import DATA_PROCESS_SERVICE
+from nexent import MessageObserver
+from nexent.core.models import OpenAIVLModel
+
+from backend.consts.const import MODEL_CONFIG_MAPPING
+from backend.utils.config_utils import tenant_config_manager, get_model_name_from_config
 
 logger = logging.getLogger("image_service")
 
@@ -23,3 +28,19 @@ async def proxy_image_impl(decoded_url: str):
 
             result = await response.json()
             return result
+
+def get_vlm_model(tenant_id: str):
+    # Get the tenant config
+    vlm_model_config = tenant_config_manager.get_model_config(
+        key=MODEL_CONFIG_MAPPING["vlm"], tenant_id=tenant_id)
+    return OpenAIVLModel(
+                observer=MessageObserver(),
+                model_id=get_model_name_from_config(
+                    vlm_model_config) if vlm_model_config else "",
+                api_base=vlm_model_config.get("base_url", ""),
+                api_key=vlm_model_config.get("api_key", ""),
+                temperature=0.7,
+                top_p=0.7,
+                frequency_penalty=0.5,
+                max_tokens=512
+            )

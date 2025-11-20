@@ -27,12 +27,9 @@ from database.user_tenant_db import get_all_tenant_ids
 from services.vectordatabase_service import get_embedding_model, get_vector_db_core
 from services.tenant_config_service import get_selected_knowledge_list
 
-from backend.consts.const import MODEL_CONFIG_MAPPING
 from backend.database.client import minio_client, MinioClient
-from backend.utils.config_utils import tenant_config_manager, get_model_name_from_config
+from backend.services.image_service import get_vlm_model
 from backend.utils.prompt_template_utils import get_analyze_file_prompt_template
-from sdk.nexent import MessageObserver
-from sdk.nexent.core.models import OpenAIVLModel
 
 logger = logging.getLogger("tool_configuration_service")
 
@@ -621,22 +618,10 @@ def _validate_local_tool(
                 'embedding_model': embedding_model,
             }
             tool_instance = tool_class(**params)
-        elif tool_name == "image_text_understanding_tool":
+        elif tool_name == "image_text_understanding":
             if not tenant_id or not user_id:
                 raise ToolExecutionException(f"Tenant ID and User ID are required for {tool_name} validation")
-            vlm_model_config = tenant_config_manager.get_model_config(
-                key=MODEL_CONFIG_MAPPING["vlm"], tenant_id=tenant_id)
-            image_to_text_model = OpenAIVLModel(
-                observer=MessageObserver(),
-                model_id=get_model_name_from_config(
-                    vlm_model_config) if vlm_model_config else "",
-                api_base=vlm_model_config.get("base_url", ""),
-                api_key=vlm_model_config.get("api_key", ""),
-                temperature=0.7,
-                top_p=0.7,
-                frequency_penalty=0.5,
-                max_tokens=512
-            )
+            image_to_text_model = get_vlm_model(tenant_id=tenant_id)
             # Load prompts from yaml file
             language = 'zh'
             prompts = get_analyze_file_prompt_template(language)

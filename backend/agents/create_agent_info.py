@@ -25,6 +25,10 @@ from utils.prompt_template_utils import get_agent_prompt_template
 from utils.config_utils import tenant_config_manager, get_model_name_from_config
 from consts.const import LOCAL_MCP_SERVER, MODEL_CONFIG_MAPPING, LANGUAGE
 
+from backend.database.client import minio_client
+from backend.services.image_service import get_vlm_model
+from backend.utils.prompt_template_utils import get_analyze_file_prompt_template
+
 logger = logging.getLogger("create_agent_info")
 logger.setLevel(logging.DEBUG)
 
@@ -236,6 +240,18 @@ async def create_tool_config_list(agent_id, tenant_id, user_id):
                 "vdb_core": get_vector_db_core(),
                 "embedding_model": get_embedding_model(tenant_id=tenant_id),
             }
+        elif tool_config.class_name == "ImageUnderstandingTool":
+            # Load prompts from yaml file
+            language = 'zh'
+            prompts = get_analyze_file_prompt_template(language)
+            system_prompt_template = Template(prompts['image_analysis']['system_prompt'],
+                                              undefined=StrictUndefined)
+            tool_config.metadata = {
+                "vlm_model": get_vlm_model(tenant_id=tenant_id),
+                "storage_client": minio_client,
+                "system_prompt_template": system_prompt_template,
+            }
+
         tool_config_list.append(tool_config)
 
     return tool_config_list
