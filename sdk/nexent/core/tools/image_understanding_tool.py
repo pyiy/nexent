@@ -2,12 +2,13 @@ import json
 import logging
 from io import BytesIO
 
-from jinja2 import Template
+from jinja2 import Template, StrictUndefined
 from pydantic import Field
 from smolagents.tools import Tool
 
 from ..models.openai_vlm import OpenAIVLModel
 from ..utils.observer import MessageObserver, ProcessType
+from ..utils.prompt_template_utils import get_prompt_template
 from ..utils.tools_common_message import ToolCategory, ToolSign
 from ... import MinIOStorageClient
 from ...multi_modal.load_save_object import LoadSaveObjectManager
@@ -50,21 +51,16 @@ class ImageUnderstandingTool(Tool):
         super().__init__()
         self.observer = observer
         self.vlm_model = vlm_model
-        # Use provided storage_client or create a default one
-        # if storage_client is None:
-        #     storage_client = create_storage_client_from_config()
         self.storage_client = storage_client
         self.system_prompt_template = system_prompt_template
-
-
         # Create LoadSaveObjectManager with the storage client
         self.mm = LoadSaveObjectManager(storage_client=self.storage_client)
 
         # Dynamically apply the load_object decorator to forward method
         self.forward = self.mm.load_object(input_names=["image_url"])(self._forward_impl)
 
-        self.running_prompt_zh = "正在分析图片文字..."
-        self.running_prompt_en = "Analyzing image text..."
+        self.running_prompt_zh = "正在理解图片..."
+        self.running_prompt_en = "Understanding image..."
 
     def _forward_impl(self, image_url: bytes, query: str) -> str:
         """
@@ -92,15 +88,20 @@ class ImageUnderstandingTool(Tool):
             card_content = [{"icon": "image", "text": "Processing image..."}]
             self.observer.add_message("", ProcessType.CARD, json.dumps(card_content, ensure_ascii=False))
 
-        # # Load messages based on language
-        # messages = get_file_processing_messages_template(language)
+        # Load prompts from yaml file
+        prompts = get_prompt_template(template_type='understand_image',language = self.observer.lang)
 
         try:
-            text = self.vlm_model.analyze_image(
-                image_input=image_stream,
-                system_prompt=self.system_prompt_template.render({'query': query})).content
-            return text
-            # return messages["IMAGE_CONTENT_SUCCESS"].format(filename=filename, content=text)
-        except Exception as e:
-            raise e
 
+            response = self.vlm_model.analyze_image(
+                image_input=image_stream,
+                system_prompt=Template(prompts['system_prompt'],undefined=StrictUndefined).render({'query': query}))
+        except Exception as e:
+            raise Exception(f"Error understanding image: {str(e)}")
+        text = response.content
+        # Record the detailed content of this search
+        search_results_data = {'text':text}
+        if self.observer:
+            search_results_data = json.dumps(search_results_data, ensure_ascii=False)
+            self.observer.add_message("", ProcessType.SEARCH_CONTENT, search_results_data)
+        return json.dumps(search_results_data, ensure_ascii=False)

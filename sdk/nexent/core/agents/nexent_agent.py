@@ -75,7 +75,6 @@ class NexentAgent:
                 tools_obj = tool_class(observer=self.observer,
                                        vlm_model=tool_config.metadata.get("vlm_model", []),
                                        storage_client=tool_config.metadata.get("storage_client", []),
-                                       system_prompt_template=tool_config.metadata.get("system_prompt_template", []),
                                        **params)
             else:
                 tools_obj = tool_class(**params)

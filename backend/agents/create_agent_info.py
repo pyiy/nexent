@@ -241,15 +241,9 @@ async def create_tool_config_list(agent_id, tenant_id, user_id):
                 "embedding_model": get_embedding_model(tenant_id=tenant_id),
             }
         elif tool_config.class_name == "ImageUnderstandingTool":
-            # Load prompts from yaml file
-            language = 'zh'
-            prompts = get_analyze_file_prompt_template(language)
-            system_prompt_template = Template(prompts['image_analysis']['system_prompt'],
-                                              undefined=StrictUndefined)
             tool_config.metadata = {
                 "vlm_model": get_vlm_model(tenant_id=tenant_id),
                 "storage_client": minio_client,
-                "system_prompt_template": system_prompt_template,
             }
 
         tool_config_list.append(tool_config)
