@@ -4,12 +4,13 @@ import logging
 import os
 import uuid
 from collections import deque
-from typing import Optional, Dict
+from typing import Callable, Optional, Dict
 
 from fastapi import Header, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from nexent.core.agents.run_agent import agent_run
 from nexent.memory.memory_service import clear_memory, add_memory_in_levels
+from jinja2 import Template
 
 from agents.agent_run_manager import agent_run_manager
 from agents.create_agent_info import create_agent_run_info, create_tool_config_list
@@ -55,10 +56,11 @@ from services.memory_config_service import build_memory_context
 from services.remote_mcp_service import add_remote_mcp_server_list
 from services.tool_configuration_service import update_tool_list
 from utils.auth_utils import get_current_user_info, get_user_language
-from utils.config_utils import tenant_config_manager
+from utils.config_utils import tenant_config_manager, get_model_name_from_config
 from utils.memory_utils import build_memory_config
 from utils.thread_utils import submit
 from utils.prompt_template_utils import get_prompt_generate_prompt_template
+from smolagents import OpenAIServerModel
 
 # Import monitoring utilities
 from utils.monitoring import monitoring_manager
@@ -138,281 +140,277 @@ def _resolve_model_with_fallback(
     return None
 
 
-def _check_agent_param_duplicate(
-    name: str,
-    check_param: str = "name",
-    existing_agents: list[dict] | None = None,
-    exclude_agent_id: int | None = None
+def _normalize_language_key(language: str) -> str:
+    normalized = (language or "").lower()
+    if normalized.startswith(LANGUAGE["ZH"]):
+        return LANGUAGE["ZH"]
+    return LANGUAGE["EN"]
+
+
+def _render_prompt_template(template_str: str, **context) -> str:
+    if not template_str:
+        return ""
+    try:
+        return Template(template_str).render(**context).strip()
+    except Exception as exc:
+        logger.warning(f"Failed to render prompt template: {exc}")
+        return template_str
+
+
+def _format_existing_values(values: set[str], language: str) -> str:
+    if not values:
+        return "无" if _normalize_language_key(language) == LANGUAGE["ZH"] else "None"
+    return ", ".join(sorted(values))
+
+
+def _check_agent_value_duplicate(
+    field_key: str,
+    value: str,
+    tenant_id: str,
+    exclude_agent_id: int | None = None,
+    agents_cache: list[dict] | None = None
 ) -> bool:
-    """
-    Check if a specific agent field already exists in the provided list.
-    
-    Args:
-        name: Agent name or display_name to check
-        check_param: Field key to inspect (e.g., "name", "display_name")
-        existing_agents: Optional pre-fetched agent list to avoid extra DB calls
-        exclude_agent_id: Optional agent ID to exclude from check (for updates)
-    
-    Returns:
-        True if duplicate exists, False otherwise
-    """
-    if not existing_agents:
+    if not value:
         return False
-    
-    for agent in existing_agents:
+    if agents_cache is None:
+        agents_cache = query_all_agent_info_by_tenant_id(tenant_id)
+    for agent in agents_cache:
         if exclude_agent_id and agent.get("agent_id") == exclude_agent_id:
             continue
-        if agent.get(check_param) == name:
+        if agent.get(field_key) == value:
             return True
     return False
 
 
-def _generate_unique_value_with_suffix(
-    base_name: str,
-    check_param: str,
-    *,
-    existing_values: set[str] | None = None,
-    existing_agents: list[dict] | None = None,
+def _check_agent_name_duplicate(
+    name: str,
+    tenant_id: str,
     exclude_agent_id: int | None = None,
-    max_suffix_attempts: int = 100,
-    error_message: str
-) -> str:
-    counter = 1
-    while counter <= max_suffix_attempts:
-        candidate = f"{base_name}_{counter}"
-        if existing_values is not None:
-            if candidate not in existing_values:
-                existing_values.add(candidate)
-                return candidate
-        else:
-            if not _check_agent_param_duplicate(
-                candidate,
-                check_param=check_param,
-                existing_agents=existing_agents,
-                exclude_agent_id=exclude_agent_id
-            ):
-                return candidate
-        counter += 1
-    raise ValueError(error_message)
+    agents_cache: list[dict] | None = None
+) -> bool:
+    return _check_agent_value_duplicate(
+        "name",
+        name,
+        tenant_id=tenant_id,
+        exclude_agent_id=exclude_agent_id,
+        agents_cache=agents_cache
+    )
 
 
-def _generate_unique_agent_name_with_suffix(
-    base_name: str,
-    existing_names: set[str] | None = None,
-    existing_agents: list[dict] | None = None,
+def _check_agent_display_name_duplicate(
+    display_name: str,
+    tenant_id: str,
+    exclude_agent_id: int | None = None,
+    agents_cache: list[dict] | None = None
+) -> bool:
+    return _check_agent_value_duplicate(
+        "display_name",
+        display_name,
+        tenant_id=tenant_id,
+        exclude_agent_id=exclude_agent_id,
+        agents_cache=agents_cache
+    )
+
+
+def _generate_unique_value_with_suffix(
+    base_value: str,
+    *,
+    tenant_id: str,
+    duplicate_check_fn: Callable[..., bool],
+    agents_cache: list[dict] | None = None,
     exclude_agent_id: int | None = None,
     max_suffix_attempts: int = 100
 ) -> str:
+    counter = 1
+    while counter <= max_suffix_attempts:
+        candidate = f"{base_value}_{counter}"
+        if not duplicate_check_fn(
+            candidate,
+            tenant_id=tenant_id,
+            exclude_agent_id=exclude_agent_id,
+            agents_cache=agents_cache
+        ):
+            return candidate
+        counter += 1
+    raise ValueError("Failed to generate unique value after max attempts")
+
+
+def _generate_unique_agent_name_with_suffix(
+    base_value: str,
+    tenant_id: str,
+    agents_cache: list[dict] | None = None,
+    exclude_agent_id: int | None = None
+) -> str:
     return _generate_unique_value_with_suffix(
-        base_name,
-        "name",
-        existing_values=existing_names,
-        existing_agents=existing_agents,
-        exclude_agent_id=exclude_agent_id,
-        max_suffix_attempts=max_suffix_attempts,
-        error_message="Failed to generate unique agent name after max attempts"
+        base_value,
+        tenant_id=tenant_id,
+        duplicate_check_fn=_check_agent_name_duplicate,
+        agents_cache=agents_cache,
+        exclude_agent_id=exclude_agent_id
     )
 
 
 def _generate_unique_display_name_with_suffix(
-    base_name: str,
-    existing_display_names: set[str] | None = None,
-    existing_agents: list[dict] | None = None,
-    exclude_agent_id: int | None = None,
-    max_suffix_attempts: int = 100
+    base_value: str,
+    tenant_id: str,
+    agents_cache: list[dict] | None = None,
+    exclude_agent_id: int | None = None
 ) -> str:
     return _generate_unique_value_with_suffix(
-        base_name,
-        "display_name",
-        existing_values=existing_display_names,
-        existing_agents=existing_agents,
-        exclude_agent_id=exclude_agent_id,
-        max_suffix_attempts=max_suffix_attempts,
-        error_message="Failed to generate unique agent display name after max attempts"
+        base_value,
+        tenant_id=tenant_id,
+        duplicate_check_fn=_check_agent_display_name_duplicate,
+        agents_cache=agents_cache,
+        exclude_agent_id=exclude_agent_id
     )
+
+
+def _regenerate_agent_value_with_llm(
+    *,
+    original_value: str,
+    existing_values: list[str],
+    task_description: str,
+    model_id: int,
+    tenant_id: str,
+    language: str,
+    system_prompt_key: str,
+    user_prompt_key: str,
+    default_system_prompt: str,
+    default_user_prompt_builder: Callable[[dict], str],
+    fallback_fn: Callable[[str], str]
+) -> str:
+    """
+    Shared helper to regenerate agent-related values with an LLM.
+    """
+    prompt_template = get_prompt_generate_prompt_template(language)
+    system_prompt = _render_prompt_template(
+        prompt_template.get(system_prompt_key, ""),
+        original_value=original_value
+    )
+    user_prompt_template = prompt_template.get(user_prompt_key, "")
+
+    value_set = {value for value in existing_values if value}
+    context = {
+        "task_description": task_description or "",
+        "original_value": original_value,
+        "existing_values": _format_existing_values(value_set, language)
+    }
+    user_prompt = _render_prompt_template(user_prompt_template, **context)
+
+    if not system_prompt:
+        system_prompt = default_system_prompt
+    if not user_prompt:
+        user_prompt = default_user_prompt_builder(context)
+
+    max_attempts = 5
+    last_error: Exception | None = None
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            from services.prompt_service import call_llm_for_system_prompt
+            regenerated_value = call_llm_for_system_prompt(
+                model_id=model_id,
+                user_prompt=user_prompt,
+                system_prompt=system_prompt,
+                callback=None,
+                tenant_id=tenant_id
+            )
+            candidate = (regenerated_value or "").strip().splitlines()[0].strip()
+            if candidate in value_set:
+                raise ValueError(f"Generated duplicate value '{candidate}'")
+            return candidate
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                f"Attempt {attempt}/{max_attempts} to regenerate value failed: {exc}"
+            )
+
+    logger.error(
+        "Failed to regenerate agent value with LLM after maximum retries",
+        exc_info=last_error
+    )
+    return fallback_fn(original_value)
 
 
 def _regenerate_agent_name_with_llm(
     original_name: str,
-    existing_names: set[str] | None,
+    existing_names: list[str],
     task_description: str,
     model_id: int,
     tenant_id: str,
-    language: str = LANGUAGE["ZH"]
+    language: str = LANGUAGE["ZH"],
+    agents_cache: list[dict] | None = None,
+    exclude_agent_id: int | None = None
 ) -> str:
-    """
-    Regenerate agent name using LLM to ensure it's similar but not duplicate.
-    
-    Args:
-        original_name: Original agent name
-        existing_names: List of existing agent names to avoid
-        task_description: Task description for context
-        model_id: Model ID to use for generation
-        tenant_id: Tenant ID
-        language: Language code
-    
-    Returns:
-        Regenerated agent name
-    """
-    prompt_template = get_prompt_generate_prompt_template(language)
-    base_system_prompt = prompt_template.get("AGENT_VARIABLE_NAME_SYSTEM_PROMPT", "")
-    constraint_system_prompt = prompt_template.get("AGENT_VARIABLE_NAME_REGENERATE_SYSTEM_PROMPT", "")
-    user_prompt_template = prompt_template.get("AGENT_VARIABLE_NAME_REGENERATE_USER_PROMPT", "")
-
-    existing_name_set = existing_names if existing_names is not None else set()
-    existing_names_str = ", ".join(sorted(existing_name_set)) if existing_name_set else "None"
-
-    if constraint_system_prompt:
-        system_prompt = (
-            f"{base_system_prompt}\n\n"
-            f"{constraint_system_prompt.format(original_name=original_name, existing_names=existing_names_str)}"
+    return _regenerate_agent_value_with_llm(
+        original_value=original_name,
+        existing_values=existing_names,
+        task_description=task_description,
+        model_id=model_id,
+        tenant_id=tenant_id,
+        language=language,
+        system_prompt_key="AGENT_NAME_REGENERATE_SYSTEM_PROMPT",
+        user_prompt_key="AGENT_NAME_REGENERATE_USER_PROMPT",
+        default_system_prompt=(
+            "You refine agent variable names so that they stay close to the "
+            "original meaning and remain unique within the tenant."
+        ),
+        default_user_prompt_builder=lambda ctx: (
+            f"### Task Description:\n{ctx['task_description']}\n\n"
+            f"### Original Name:\n{ctx['original_value']}\n\n"
+            f"### Existing Names:\n{ctx['existing_values']}\n\n"
+            "Generate a concise Python variable name that keeps the same "
+            "meaning and does not duplicate the existing names. Return only "
+            "the variable name."
+        ),
+        fallback_fn=lambda base_value: _generate_unique_agent_name_with_suffix(
+            base_value,
+            tenant_id=tenant_id,
+            agents_cache=agents_cache,
+            exclude_agent_id=exclude_agent_id
         )
-    else:
-        system_prompt = f"{base_system_prompt}"
-
-    if user_prompt_template:
-        user_prompt = user_prompt_template.format(
-            task_description=task_description or "",
-            original_name=original_name,
-            existing_names=existing_names_str
-        )
-    else:
-        user_prompt = (
-            f"### Task Description:\n{task_description}\n\n"
-            f"### Original Name (for reference):\n{original_name}\n\n"
-            f"### Existing Names to Avoid:\n{existing_names_str}\n\n"
-            f"Please generate a new agent variable name that is similar in meaning to "
-            f"\"{original_name}\" but different from all existing names."
-        )
-
-    max_attempts = 5
-    last_error = None
-
-    for attempt in range(1, max_attempts + 1):
-        try:
-            from services.prompt_service import call_llm_for_system_prompt
-            regenerated_name = call_llm_for_system_prompt(
-                model_id=model_id,
-                user_prompt=user_prompt,
-                system_prompt=system_prompt,
-                callback=None,
-                tenant_id=tenant_id
-            )
-            regenerated_name = (regenerated_name or "").strip().replace('\n', '').strip()
-
-            if not regenerated_name:
-                raise ValueError("Generated empty agent name")
-            if not regenerated_name.isidentifier():
-                raise ValueError(f"Generated invalid agent name '{regenerated_name}'")
-            if regenerated_name in existing_name_set:
-                raise ValueError(f"Generated duplicate agent name '{regenerated_name}'")
-
-            existing_name_set.add(regenerated_name)
-            return regenerated_name
-        except Exception as exc:
-            last_error = exc
-            logger.warning(
-                f"Attempt {attempt}/{max_attempts} to regenerate agent name failed: {exc}"
-            )
-
-    logger.error(
-        "Failed to regenerate agent name with LLM after maximum retries",
-        exc_info=last_error
     )
-    return _generate_unique_agent_name_with_suffix(
-        original_name,
-        existing_names=existing_name_set
-    )
+
 
 
 def _regenerate_agent_display_name_with_llm(
     original_display_name: str,
-    existing_display_names: set[str] | None,
+    existing_display_names: list[str],
     task_description: str,
     model_id: int,
     tenant_id: str,
-    language: str = LANGUAGE["ZH"]
+    language: str = LANGUAGE["ZH"],
+    agents_cache: list[dict] | None = None,
+    exclude_agent_id: int | None = None
 ) -> str:
-    """
-    Regenerate agent display_name using LLM to ensure it's similar but not duplicate.
-    
-    Args:
-        original_display_name: Original agent display_name
-        existing_display_names: List of existing agent display_names to avoid
-        task_description: Task description for context
-        model_id: Model ID to use for generation
-        tenant_id: Tenant ID
-        language: Language code
-    
-    Returns:
-        Regenerated agent display_name
-    """
-    prompt_template = get_prompt_generate_prompt_template(language)
-    base_system_prompt = prompt_template.get("AGENT_DISPLAY_NAME_SYSTEM_PROMPT", "")
-    constraint_system_prompt = prompt_template.get("AGENT_DISPLAY_NAME_REGENERATE_SYSTEM_PROMPT", "")
-    user_prompt_template = prompt_template.get("AGENT_DISPLAY_NAME_REGENERATE_USER_PROMPT", "")
-
-    existing_display_name_set = existing_display_names if existing_display_names is not None else set()
-    existing_names_str = ", ".join(sorted(existing_display_name_set)) if existing_display_name_set else "None"
-
-    if constraint_system_prompt:
-        system_prompt = (
-            f"{base_system_prompt}\n\n"
-            f"{constraint_system_prompt.format(original_display_name=original_display_name, existing_display_names=existing_names_str)}"
+    return _regenerate_agent_value_with_llm(
+        original_value=original_display_name,
+        existing_values=existing_display_names,
+        task_description=task_description,
+        model_id=model_id,
+        tenant_id=tenant_id,
+        language=language,
+        system_prompt_key="AGENT_DISPLAY_NAME_REGENERATE_SYSTEM_PROMPT",
+        user_prompt_key="AGENT_DISPLAY_NAME_REGENERATE_USER_PROMPT",
+        default_system_prompt=(
+            "You refine agent display names so they remain unique, concise, "
+            "and aligned with the agent's capability."
+        ),
+        default_user_prompt_builder=lambda ctx: (
+            f"### Task Description:\n{ctx['task_description']}\n\n"
+            f"### Original Display Name:\n{ctx['original_value']}\n\n"
+            f"### Existing Display Names:\n{ctx['existing_values']}\n\n"
+            "Generate a new display name that keeps the same meaning but does "
+            "not duplicate existing names. Return only the display name."
+        ),
+        fallback_fn=lambda base_value: _generate_unique_display_name_with_suffix(
+            base_value,
+            tenant_id=tenant_id,
+            agents_cache=agents_cache,
+            exclude_agent_id=exclude_agent_id
         )
-    else:
-        system_prompt = f"{base_system_prompt}"
-
-    if user_prompt_template:
-        user_prompt = user_prompt_template.format(
-            task_description=task_description or "",
-            original_display_name=original_display_name,
-            existing_display_names=existing_names_str
-        )
-    else:
-        user_prompt = (
-            f"### Task Description:\n{task_description}\n\n"
-            f"### Original Display Name (for reference):\n{original_display_name}\n\n"
-            f"### Existing Display Names to Avoid:\n{existing_names_str}\n\n"
-            f"Please generate a new agent display name that is similar in meaning to "
-            f"\"{original_display_name}\" but different from all existing names."
-        )
-
-    max_attempts = 5
-    last_error = None
-
-    for attempt in range(1, max_attempts + 1):
-        try:
-            from services.prompt_service import call_llm_for_system_prompt
-            regenerated_name = call_llm_for_system_prompt(
-                model_id=model_id,
-                user_prompt=user_prompt,
-                system_prompt=system_prompt,
-                callback=None,
-                tenant_id=tenant_id
-            )
-            regenerated_name = (regenerated_name or "").strip().replace('\n', '').strip()
-            if not regenerated_name:
-                raise ValueError("Generated empty display name")
-            if regenerated_name in existing_display_name_set:
-                raise ValueError(f"Generated duplicate display name '{regenerated_name}'")
-
-            existing_display_name_set.add(regenerated_name)
-            return regenerated_name
-        except Exception as exc:
-            last_error = exc
-            logger.warning(
-                f"Attempt {attempt}/{max_attempts} to regenerate agent display name failed: {exc}"
-            )
-
-    logger.error(
-        "Failed to regenerate agent display name with LLM after maximum retries",
-        exc_info=last_error
     )
-    return _generate_unique_display_name_with_suffix(
-        original_display_name,
-        existing_display_names=existing_display_name_set
-    )
+
 
 
 async def _stream_agent_chunks(
@@ -1028,11 +1026,11 @@ async def import_agent_by_agent_id(import_agent_info: ExportAndImportAgentInfo, 
     
     # Get all existing agent names and display names for duplicate checking
     all_agents = query_all_agent_info_by_tenant_id(tenant_id)
-    existing_names = {agent.get("name") for agent in all_agents if agent.get("name")}
-    existing_display_names = {agent.get("display_name") for agent in all_agents if agent.get("display_name")}
+    existing_names = [agent.get("name") for agent in all_agents if agent.get("name")]
+    existing_display_names = [agent.get("display_name") for agent in all_agents if agent.get("display_name")]
     
     # Check and regenerate name if duplicate
-    if _check_agent_param_duplicate(agent_name, existing_agents=all_agents):
+    if _check_agent_name_duplicate(agent_name, tenant_id, agents_cache=all_agents):
         logger.info(f"Agent name '{agent_name}' already exists, regenerating with LLM")
         # Get model for regeneration (use business_logic_model_id if available, otherwise use model_id)
         regeneration_model_id = business_logic_model_id or model_id
@@ -1044,32 +1042,27 @@ async def import_agent_by_agent_id(import_agent_info: ExportAndImportAgentInfo, 
                     task_description=import_agent_info.business_description or import_agent_info.description or "",
                     model_id=regeneration_model_id,
                     tenant_id=tenant_id,
-                    language=LANGUAGE["ZH"]  # Default to Chinese, can be enhanced later
+                    language=LANGUAGE["ZH"],  # Default to Chinese, can be enhanced later
+                    agents_cache=all_agents
                 )
                 logger.info(f"Regenerated agent name: '{agent_name}'")
             except Exception as e:
                 logger.error(f"Failed to regenerate agent name with LLM: {str(e)}, using fallback")
-                # Fallback: add suffix
                 agent_name = _generate_unique_agent_name_with_suffix(
                     agent_name,
-                    existing_names=existing_names,
-                    existing_agents=all_agents
+                    tenant_id=tenant_id,
+                    agents_cache=all_agents
                 )
         else:
             logger.warning("No model available for regeneration, using fallback")
-            # Fallback: add suffix
             agent_name = _generate_unique_agent_name_with_suffix(
                 agent_name,
-                existing_names=existing_names,
-                existing_agents=all_agents
+                tenant_id=tenant_id,
+                agents_cache=all_agents
             )
     
     # Check and regenerate display_name if duplicate
-    if _check_agent_param_duplicate(
-        agent_display_name,
-        check_param="display_name",
-        existing_agents=all_agents
-    ):
+    if _check_agent_display_name_duplicate(agent_display_name, tenant_id, agents_cache=all_agents):
         logger.info(f"Agent display_name '{agent_display_name}' already exists, regenerating with LLM")
         # Get model for regeneration (use business_logic_model_id if available, otherwise use model_id)
         regeneration_model_id = business_logic_model_id or model_id
@@ -1081,30 +1074,24 @@ async def import_agent_by_agent_id(import_agent_info: ExportAndImportAgentInfo, 
                     task_description=import_agent_info.business_description or import_agent_info.description or "",
                     model_id=regeneration_model_id,
                     tenant_id=tenant_id,
-                    language=LANGUAGE["ZH"]  # Default to Chinese, can be enhanced later
+                    language=LANGUAGE["ZH"],  # Default to Chinese, can be enhanced later
+                    agents_cache=all_agents
                 )
                 logger.info(f"Regenerated agent display_name: '{agent_display_name}'")
             except Exception as e:
                 logger.error(f"Failed to regenerate agent display_name with LLM: {str(e)}, using fallback")
-                # Fallback: add suffix
                 agent_display_name = _generate_unique_display_name_with_suffix(
                     agent_display_name,
-                    existing_display_names=existing_display_names,
-                    existing_agents=all_agents
+                    tenant_id=tenant_id,
+                    agents_cache=all_agents
                 )
         else:
             logger.warning("No model available for regeneration, using fallback")
-            # Fallback: add suffix
             agent_display_name = _generate_unique_display_name_with_suffix(
                 agent_display_name,
-                existing_display_names=existing_display_names,
-                existing_agents=all_agents
+                tenant_id=tenant_id,
+                agents_cache=all_agents
             )
-
-    if agent_name:
-        existing_names.add(agent_name)
-    if agent_display_name:
-        existing_display_names.add(agent_display_name)
 
     # create a new agent
     new_agent = create_agent(agent_info={"name": agent_name,

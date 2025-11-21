@@ -250,11 +250,6 @@ def generate_and_save_system_prompt_impl(agent_id: int,
                     exclude_agent_id=agent_id
                 )
 
-        if agent_name:
-            existing_names.add(agent_name)
-        if agent_display_name:
-            existing_display_names.add(agent_display_name)
-
         agent_info = AgentInfoRequest(
             agent_id=agent_id,
             business_description=task_description,
