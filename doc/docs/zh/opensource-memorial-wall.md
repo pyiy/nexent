@@ -444,3 +444,7 @@ Nexent功能如此之强大，给我很多帮助，感谢开发者！厉害
 ::: info user - 2025-11-20
 学习ai - agent非常好的项目，后面会持续输出贡献！
 :::
+
+::: williamllk from SJTU - 2025-11-23
+感谢 Nexent 让我第一次制作智能体，尝试将AI4Science的理念付诸实践
+:::
