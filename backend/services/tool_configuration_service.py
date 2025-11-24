@@ -6,7 +6,6 @@ import logging
 from typing import Any, List, Optional, Dict
 from urllib.parse import urljoin
 
-from jinja2 import Template, StrictUndefined
 from pydantic_core import PydanticUndefined
 from fastmcp import Client
 import jsonref
@@ -27,9 +26,8 @@ from database.user_tenant_db import get_all_tenant_ids
 from services.vectordatabase_service import get_embedding_model, get_vector_db_core
 from services.tenant_config_service import get_selected_knowledge_list
 
-from backend.database.client import minio_client, MinioClient
+from backend.database.client import minio_client
 from backend.services.image_service import get_vlm_model
-from backend.utils.prompt_template_utils import get_analyze_file_prompt_template
 
 logger = logging.getLogger("tool_configuration_service")
 

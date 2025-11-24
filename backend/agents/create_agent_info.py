@@ -27,7 +27,6 @@ from consts.const import LOCAL_MCP_SERVER, MODEL_CONFIG_MAPPING, LANGUAGE
 
 from backend.database.client import minio_client
 from backend.services.image_service import get_vlm_model
-from backend.utils.prompt_template_utils import get_analyze_file_prompt_template
 
 logger = logging.getLogger("create_agent_info")
 logger.setLevel(logging.DEBUG)
