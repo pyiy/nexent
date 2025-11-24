@@ -618,7 +618,7 @@ def _validate_local_tool(
                 'embedding_model': embedding_model,
             }
             tool_instance = tool_class(**params)
-        elif tool_name == "image_understanding":
+        elif tool_name == "analyze_image":
             if not tenant_id or not user_id:
                 raise ToolExecutionException(f"Tenant ID and User ID are required for {tool_name} validation")
             image_to_text_model = get_vlm_model(tenant_id=tenant_id)

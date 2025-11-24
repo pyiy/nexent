@@ -240,7 +240,7 @@ async def create_tool_config_list(agent_id, tenant_id, user_id):
                 "vdb_core": get_vector_db_core(),
                 "embedding_model": get_embedding_model(tenant_id=tenant_id),
             }
-        elif tool_config.class_name == "ImageUnderstandingTool":
+        elif tool_config.class_name == "AnalyzeImageTool":
             tool_config.metadata = {
                 "vlm_model": get_vlm_model(tenant_id=tenant_id),
                 "storage_client": minio_client,

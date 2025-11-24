@@ -71,7 +71,7 @@ class NexentAgent:
                                        vdb_core=tool_config.metadata.get("vdb_core", []),
                                        embedding_model=tool_config.metadata.get("embedding_model", []),
                                        **params)
-            elif class_name == "ImageUnderstandingTool":
+            elif class_name == "AnalyzeImageTool":
                 tools_obj = tool_class(observer=self.observer,
                                        vlm_model=tool_config.metadata.get("vlm_model", []),
                                        storage_client=tool_config.metadata.get("storage_client", []),

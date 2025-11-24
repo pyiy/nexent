@@ -13,16 +13,17 @@ from ..utils.tools_common_message import ToolCategory, ToolSign
 from ... import MinIOStorageClient
 from ...multi_modal.load_save_object import LoadSaveObjectManager
 
-logger = logging.getLogger("image_understanding_tool")
+logger = logging.getLogger("analyze_image_tool")
 
 
-class ImageUnderstandingTool(Tool):
-    """Tool for extracting text from images stored in S3-compatible storage."""
+class AnalyzeImageTool(Tool):
+    """Tool for understanding and analyzing image"""
 
-    name = "image_understanding"
+    name = "analyze_image"
     description = (
-        "Understand an image stored in S3-compatible storage or HTTP and return the text content inside the image. "
-        "Provide the object location via an s3:// URL or http:// URL or https:// URL."
+        "This tool uses a visual language model to understand images based on your query and then returns a description of the image."
+        "It's used to understand and analyze images stored in S3 buckets, via HTTP and HTTPS."
+        "Use this tool when you want to retrieve information contained in an image and provide the image's URL and your query."
     )
     inputs = {
         "image_url": {
@@ -45,32 +46,29 @@ class ImageUnderstandingTool(Tool):
             observer: MessageObserver = Field(description="Message observer", default=None, exclude=True),
             vlm_model: OpenAIVLModel = Field(description="The VLM model to use", default=None, exclude=True),
             storage_client: MinIOStorageClient = Field(description="Storage client to use", default=None, exclude=True),
-            # todo 这么写对不对
-            system_prompt_template: Template = Field(description="System prompt template to use", default=None, exclude=True),
     ):
         super().__init__()
         self.observer = observer
         self.vlm_model = vlm_model
         self.storage_client = storage_client
-        self.system_prompt_template = system_prompt_template
         # Create LoadSaveObjectManager with the storage client
         self.mm = LoadSaveObjectManager(storage_client=self.storage_client)
 
         # Dynamically apply the load_object decorator to forward method
         self.forward = self.mm.load_object(input_names=["image_url"])(self._forward_impl)
 
-        self.running_prompt_zh = "正在理解图片..."
-        self.running_prompt_en = "Understanding image..."
+        self.running_prompt_zh = "正在分析图片..."
+        self.running_prompt_en = "Analyzing image..."
 
     def _forward_impl(self, image_url: bytes, query: str) -> str:
         """
-        Analyze the image specified by the S3 URL and return recognized text.
+        Analyze images of S3 URL, HTTP URL, or HTTPS URL and return the identified text.
         
         Note: This method is wrapped by load_object decorator which downloads
-        the image from S3 URL and passes bytes to this method.
+        the image from S3 URL, HTTP URL, or HTTPS URL and passes bytes to this method.
 
         Args:
-            image_url: Image bytes (converted from S3 URL by decorator).
+            image_url: Image bytes (converted from S3 URL, HTTP URL, or HTTPS URL by decorator).
 
         Returns:
             JSON string containing the recognized text.
@@ -85,23 +83,21 @@ class ImageUnderstandingTool(Tool):
         if self.observer:
             running_prompt = self.running_prompt_zh if self.observer.lang == "zh" else self.running_prompt_en
             self.observer.add_message("", ProcessType.TOOL, running_prompt)
-            card_content = [{"icon": "image", "text": "Processing image..."}]
+            card_content = [{"icon": "image", "text": "Analyzing image..."}]
             self.observer.add_message("", ProcessType.CARD, json.dumps(card_content, ensure_ascii=False))
 
         # Load prompts from yaml file
-        prompts = get_prompt_template(template_type='understand_image',language = self.observer.lang)
+        prompts = get_prompt_template(template_type='analyze_image', language=self.observer.lang)
 
         try:
 
             response = self.vlm_model.analyze_image(
                 image_input=image_stream,
-                system_prompt=Template(prompts['system_prompt'],undefined=StrictUndefined).render({'query': query}))
+                system_prompt=Template(prompts['system_prompt'], undefined=StrictUndefined).render({'query': query}))
         except Exception as e:
             raise Exception(f"Error understanding image: {str(e)}")
         text = response.content
         # Record the detailed content of this search
-        search_results_data = {'text':text}
-        if self.observer:
-            search_results_data = json.dumps(search_results_data, ensure_ascii=False)
-            self.observer.add_message("", ProcessType.SEARCH_CONTENT, search_results_data)
+        # todo 返回的结构体是什么？
+        search_results_data = {'text': text}
         return json.dumps(search_results_data, ensure_ascii=False)
