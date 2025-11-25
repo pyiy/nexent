@@ -481,3 +481,7 @@ xiaofu到此一游，感谢 Nexent 让我踏上了开源之旅！
 ::: info aurorahashcat - 2025-11-23
 nexent看起来超棒的自动化智能体构建平台，祝越来越好😀
 :::
+
+::: williamllk from SJTU - 2025-11-23
+感谢 Nexent 让我第一次制作智能体，尝试将AI4Science的理念付诸实践
+:::
