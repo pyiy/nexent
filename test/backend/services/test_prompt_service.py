@@ -233,6 +233,139 @@ class TestPromptService(unittest.TestCase):
         # In create mode, should NOT call update_agent
         mock_update_agent.assert_not_called()
 
+    @patch('backend.services.prompt_service.update_agent')
+    @patch('backend.services.prompt_service._regenerate_agent_display_name_with_llm')
+    @patch('backend.services.prompt_service._regenerate_agent_name_with_llm')
+    @patch('backend.services.prompt_service._check_agent_display_name_duplicate')
+    @patch('backend.services.prompt_service._check_agent_name_duplicate')
+    @patch('backend.services.prompt_service.query_all_agent_info_by_tenant_id')
+    @patch('backend.services.prompt_service.generate_system_prompt')
+    @patch('backend.services.prompt_service.query_tools_by_ids')
+    @patch('backend.services.prompt_service.search_agent_info_by_agent_id')
+    def test_generate_and_save_system_prompt_impl_duplicate_names_regenerated(
+        self,
+        mock_search_agent_info,
+        mock_query_tools,
+        mock_generate_system_prompt,
+        mock_query_all_agents,
+        mock_check_name_dup,
+        mock_check_display_dup,
+        mock_regen_name,
+        mock_regen_display,
+        mock_update_agent,
+    ):
+        """Duplicate agent_var_name / agent_display_name should be regenerated via LLM helpers."""
+        # Tool and sub-agent info do not matter for this test
+        mock_query_tools.return_value = []
+        mock_search_agent_info.return_value = {}
+        mock_query_all_agents.return_value = [
+            {"agent_id": 1, "name": "dup", "display_name": "Dup Display"}
+        ]
+
+        # Force duplicate detection
+        mock_check_name_dup.return_value = True
+        mock_check_display_dup.return_value = True
+
+        # Regenerated values
+        mock_regen_name.return_value = "regen_var"
+        mock_regen_display.return_value = "Regen Display"
+
+        # Mock generator output from generate_system_prompt
+        def mock_gen(*args, **kwargs):
+            yield {"type": "agent_var_name", "content": "dup", "is_complete": True}
+            yield {"type": "agent_display_name", "content": "Dup Display", "is_complete": True}
+
+        mock_generate_system_prompt.side_effect = mock_gen
+
+        result = list(generate_and_save_system_prompt_impl(
+            agent_id=123,
+            model_id=1,
+            task_description="Task",
+            user_id="u",
+            tenant_id="t",
+            language="zh",
+            tool_ids=[1],
+            sub_agent_ids=[10],
+        ))
+
+        # Should yield regenerated names
+        var_items = [r for r in result if r["type"] == "agent_var_name"]
+        disp_items = [r for r in result if r["type"] == "agent_display_name"]
+        self.assertEqual(var_items[0]["content"], "regen_var")
+        self.assertEqual(disp_items[0]["content"], "Regen Display")
+
+        mock_regen_name.assert_called_once()
+        mock_regen_display.assert_called_once()
+        mock_update_agent.assert_called_once()
+
+    @patch('backend.services.prompt_service.update_agent')
+    @patch('backend.services.prompt_service._generate_unique_display_name_with_suffix')
+    @patch('backend.services.prompt_service._generate_unique_agent_name_with_suffix')
+    @patch('backend.services.prompt_service._regenerate_agent_display_name_with_llm')
+    @patch('backend.services.prompt_service._regenerate_agent_name_with_llm')
+    @patch('backend.services.prompt_service._check_agent_display_name_duplicate')
+    @patch('backend.services.prompt_service._check_agent_name_duplicate')
+    @patch('backend.services.prompt_service.query_all_agent_info_by_tenant_id')
+    @patch('backend.services.prompt_service.generate_system_prompt')
+    @patch('backend.services.prompt_service.query_tools_by_ids')
+    @patch('backend.services.prompt_service.search_agent_info_by_agent_id')
+    def test_generate_and_save_system_prompt_impl_duplicate_names_fallback_suffix(
+        self,
+        mock_search_agent_info,
+        mock_query_tools,
+        mock_generate_system_prompt,
+        mock_query_all_agents,
+        mock_check_name_dup,
+        mock_check_display_dup,
+        mock_regen_name,
+        mock_regen_display,
+        mock_generate_unique_name,
+        mock_generate_unique_display,
+        mock_update_agent,
+    ):
+        """When regeneration fails, duplicate names should fall back to suffix helpers."""
+        mock_query_tools.return_value = []
+        mock_search_agent_info.return_value = {}
+        mock_query_all_agents.return_value = [
+            {"agent_id": 1, "name": "dup", "display_name": "Dup Display"}
+        ]
+
+        mock_check_name_dup.return_value = True
+        mock_check_display_dup.return_value = True
+
+        # Force LLM regeneration failure
+        mock_regen_name.side_effect = Exception("llm error")
+        mock_regen_display.side_effect = Exception("llm error")
+
+        mock_generate_unique_name.return_value = "uniq_var"
+        mock_generate_unique_display.return_value = "Uniq Display"
+
+        def mock_gen(*args, **kwargs):
+            yield {"type": "agent_var_name", "content": "dup", "is_complete": True}
+            yield {"type": "agent_display_name", "content": "Dup Display", "is_complete": True}
+
+        mock_generate_system_prompt.side_effect = mock_gen
+
+        result = list(generate_and_save_system_prompt_impl(
+            agent_id=123,
+            model_id=1,
+            task_description="Task",
+            user_id="u",
+            tenant_id="t",
+            language="zh",
+            tool_ids=[1],
+            sub_agent_ids=[10],
+        ))
+
+        var_items = [r for r in result if r["type"] == "agent_var_name"]
+        disp_items = [r for r in result if r["type"] == "agent_display_name"]
+        self.assertEqual(var_items[0]["content"], "uniq_var")
+        self.assertEqual(disp_items[0]["content"], "Uniq Display")
+
+        mock_generate_unique_name.assert_called_once()
+        mock_generate_unique_display.assert_called_once()
+        mock_update_agent.assert_called_once()
+
     @patch('backend.services.prompt_service.generate_and_save_system_prompt_impl')
     def test_gen_system_prompt_streamable(self, mock_generate_impl):
         """Test gen_system_prompt_streamable function"""
@@ -493,6 +626,59 @@ class TestPromptService(unittest.TestCase):
         self.assertIn("assistant_description", template_vars)
         self.assertEqual(
             template_vars["task_description"], mock_task_description)
+
+
+    @patch('backend.services.prompt_service.query_tools_by_ids')
+    @patch('backend.services.prompt_service.get_enable_tool_id_by_agent_id')
+    def test_get_enabled_tool_description_for_generate_prompt(
+        self,
+        mock_get_enable_tool_ids,
+        mock_query_tools,
+    ):
+        """Wrapper should fetch enabled tool IDs then query tool details."""
+        from backend.services.prompt_service import get_enabled_tool_description_for_generate_prompt
+
+        mock_get_enable_tool_ids.return_value = [1, 2]
+        tools = [{"tool_id": 1}, {"tool_id": 2}]
+        mock_query_tools.return_value = tools
+
+        result = get_enabled_tool_description_for_generate_prompt(
+            agent_id=123, tenant_id="tenant-x"
+        )
+
+        mock_get_enable_tool_ids.assert_called_once_with(
+            agent_id=123, tenant_id="tenant-x"
+        )
+        mock_query_tools.assert_called_once_with([1, 2])
+        self.assertEqual(result, tools)
+
+    @patch('backend.services.prompt_service.search_agent_info_by_agent_id')
+    @patch('backend.services.prompt_service.query_sub_agents_id_list')
+    def test_get_enabled_sub_agent_description_for_generate_prompt(
+        self,
+        mock_query_sub_ids,
+        mock_search_agent,
+    ):
+        """Wrapper should fetch sub-agent IDs then hydrate them with info."""
+        from backend.services.prompt_service import get_enabled_sub_agent_description_for_generate_prompt
+
+        mock_query_sub_ids.return_value = [10, 20]
+        mock_search_agent.side_effect = [
+            {"agent_id": 10, "name": "A"},
+            {"agent_id": 20, "name": "B"},
+        ]
+
+        result = get_enabled_sub_agent_description_for_generate_prompt(
+            agent_id=99, tenant_id="tenant-y"
+        )
+
+        mock_query_sub_ids.assert_called_once_with(
+            main_agent_id=99, tenant_id="tenant-y"
+        )
+        self.assertEqual(mock_search_agent.call_count, 2)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["agent_id"], 10)
+        self.assertEqual(result[1]["agent_id"], 20)
 
 
     @patch('backend.services.prompt_service.get_model_by_model_id')

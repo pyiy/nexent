@@ -84,6 +84,13 @@ with patch('sqlalchemy.create_engine', return_value=mock_engine), \
         _resolve_user_tenant_language,
         _apply_duplicate_name_availability_rules,
         _check_single_model_availability,
+        _normalize_language_key,
+        _render_prompt_template,
+        _format_existing_values,
+        _generate_unique_agent_name_with_suffix,
+        _generate_unique_display_name_with_suffix,
+        _generate_unique_value_with_suffix,
+        _regenerate_agent_value_with_llm,
     )
     from consts.model import ExportAndImportAgentInfo, ExportAndImportDataFormat, MCPInfo, AgentRequest
 
@@ -5200,6 +5207,340 @@ async def test_import_agent_all_model_fields_in_database(
     assert agent_info_dict["constraint_prompt"] == "Complete constraints"
     assert agent_info_dict["few_shots_prompt"] == "Complete examples"
     assert agent_info_dict["enabled"] is True
+
+
+# =====================================================================
+# Additional tests for internal helper functions and import logic
+# =====================================================================
+
+
+def test_normalize_language_key_variants():
+    """_normalize_language_key should normalize various language inputs."""
+    from consts.const import LANGUAGE as LANG
+
+    assert _normalize_language_key("zh-CN") == LANG["ZH"]
+    assert _normalize_language_key("ZH") == LANG["ZH"]
+    assert _normalize_language_key("en") == LANG["EN"]
+    assert _normalize_language_key("EN-us") == LANG["EN"]
+    # Fallback when language is None or empty
+    assert _normalize_language_key("") == LANG["EN"]
+    assert _normalize_language_key(None) == LANG["EN"]
+
+
+def test_render_prompt_template_success(monkeypatch):
+    """_render_prompt_template should render a jinja2 template successfully."""
+
+    class FakeTemplate:
+        def __init__(self, template_str):
+            self.template_str = template_str
+
+        def render(self, **context):
+            # Very small fake renderer for test purposes
+            return self.template_str.format(**context)
+
+    monkeypatch.setattr(
+        agent_service, "Template", FakeTemplate, raising=False
+    )
+
+    tpl = "Hello {name}"
+    rendered = _render_prompt_template(tpl, name="World")
+    assert rendered == "Hello World"
+
+
+def test_render_prompt_template_on_error_returns_original(monkeypatch):
+    """When Template.render fails, _render_prompt_template should return original template."""
+
+    class FailingTemplate:
+        def __init__(self, template_str):
+            self.template_str = template_str
+
+        def render(self, **context):
+            raise ValueError("render failed")
+
+    monkeypatch.setattr(
+        agent_service, "Template", FailingTemplate, raising=False
+    )
+
+    tpl = "Broken {template"
+    # Should not raise; should return original string
+    assert _render_prompt_template(tpl, name="x") == tpl
+
+
+def test_format_existing_values_for_languages():
+    """_format_existing_values should format values and handle empty cases."""
+    from consts.const import LANGUAGE as LANG
+
+    # Non-empty set
+    values = {"b", "a"}
+    formatted = _format_existing_values(values, LANG["EN"])
+    assert formatted in {"a, b", "b, a"}  # order not guaranteed
+
+    # Empty set, English
+    assert _format_existing_values(set(), LANG["EN"]) == "None"
+    # Empty set, Chinese
+    assert _format_existing_values(set(), LANG["ZH"]).startswith("无")
+
+
+def test_check_agent_value_duplicate_with_and_without_exclude():
+    """_check_agent_value_duplicate should respect exclude_agent_id and cache."""
+    agents = [
+        {"agent_id": 1, "name": "agent_one"},
+        {"agent_id": 2, "name": "agent_two"},
+    ]
+
+    # Duplicate found
+    assert agent_service._check_agent_value_duplicate(
+        "name", "agent_one", tenant_id="t", agents_cache=agents
+    )
+    # No duplicate
+    assert not agent_service._check_agent_value_duplicate(
+        "name", "agent_three", tenant_id="t", agents_cache=agents
+    )
+    # Exclude matching id should skip that record
+    assert not agent_service._check_agent_value_duplicate(
+        "name", "agent_one", tenant_id="t", exclude_agent_id=1, agents_cache=agents
+    )
+
+
+def test_generate_unique_value_with_suffix_success():
+    """_generate_unique_value_with_suffix should find first available suffix."""
+
+    taken = {"base_1"}
+
+    def dup_check(candidate, **_):
+        return candidate in taken
+
+    result = _generate_unique_value_with_suffix(
+        "base",
+        tenant_id="tenant",
+        duplicate_check_fn=dup_check,
+        agents_cache=[],
+        max_suffix_attempts=5,
+    )
+    # base_1 is taken, so should start from base_2
+    assert result == "base_2"
+
+
+def test_generate_unique_value_with_suffix_exhausts_attempts():
+    """When all candidates are duplicates, _generate_unique_value_with_suffix should raise."""
+
+    def always_duplicate(*args, **kwargs):
+        return True
+
+    with pytest.raises(ValueError, match="Failed to generate unique value"):
+        _generate_unique_value_with_suffix(
+            "dup",
+            tenant_id="tenant",
+            duplicate_check_fn=always_duplicate,
+            agents_cache=[],
+            max_suffix_attempts=3,
+        )
+
+
+def test_generate_unique_agent_and_display_name_wrappers(monkeypatch):
+    """Wrapper helpers should delegate to _generate_unique_value_with_suffix."""
+    calls = []
+
+    def fake_generate(base_value, tenant_id, duplicate_check_fn, agents_cache, exclude_agent_id=None, max_suffix_attempts=100):
+        calls.append(
+            (base_value, tenant_id, duplicate_check_fn, tuple(agents_cache), exclude_agent_id, max_suffix_attempts)
+        )
+        return f"{base_value}_unique"
+
+    monkeypatch.setattr(
+        agent_service, "_generate_unique_value_with_suffix", fake_generate, raising=False
+    )
+
+    name = _generate_unique_agent_name_with_suffix(
+        "agent", tenant_id="t", agents_cache=[{"agent_id": 1}], exclude_agent_id=1
+    )
+    display = _generate_unique_display_name_with_suffix(
+        "Agent Display", tenant_id="t2", agents_cache=[{"agent_id": 2}]
+    )
+
+    assert name == "agent_unique"
+    assert display == "Agent Display_unique"
+    # Ensure both calls delegated correctly
+    assert len(calls) == 2
+    assert calls[0][0] == "agent"
+    assert calls[1][0] == "Agent Display"
+
+
+def test_regenerate_agent_value_with_llm_success(monkeypatch):
+    """_regenerate_agent_value_with_llm should return first non-duplicate LLM value."""
+
+    # Avoid dependency on real prompt templates
+    monkeypatch.setattr(
+        agent_service,
+        "get_prompt_generate_prompt_template",
+        lambda lang: {},
+        raising=False,
+    )
+
+    # Provide a fake LLM call that returns a new unique value
+    def fake_call_llm(model_id, user_prompt, system_prompt, callback, tenant_id):
+        assert model_id == 1
+        assert tenant_id == "tenant"
+        # Callback is not used in this helper, but should be passed through
+        return "new_name\nextra"
+
+    # Ensure the dynamic import `from services.prompt_service import ...` in
+    # `_regenerate_agent_value_with_llm` can succeed by registering a fake
+    # module in `sys.modules` with the expected attribute.
+    fake_prompt_module = MagicMock()
+    fake_prompt_module.call_llm_for_system_prompt = fake_call_llm
+    sys.modules["services.prompt_service"] = fake_prompt_module
+
+    result = _regenerate_agent_value_with_llm(
+        original_value="old",
+        existing_values=["existing"],
+        task_description="task",
+        model_id=1,
+        tenant_id="tenant",
+        language="en",
+        system_prompt_key="SYS_KEY",
+        user_prompt_key="USER_KEY",
+        default_system_prompt="sys",
+        default_user_prompt_builder=lambda ctx: "user",
+        fallback_fn=lambda base: f"fallback_{base}",
+    )
+    assert result == "new_name"
+
+
+def test_regenerate_agent_value_with_llm_fallback_on_error(monkeypatch):
+    """When LLM keeps failing, _regenerate_agent_value_with_llm should use fallback."""
+
+    monkeypatch.setattr(
+        agent_service,
+        "get_prompt_generate_prompt_template",
+        lambda lang: {},
+        raising=False,
+    )
+
+    def failing_llm(*args, **kwargs):
+        raise RuntimeError("llm failed")
+
+    fake_prompt_module = MagicMock()
+    fake_prompt_module.call_llm_for_system_prompt = failing_llm
+    sys.modules["services.prompt_service"] = fake_prompt_module
+
+    used = {}
+
+    def fallback(base):
+        used["called"] = True
+        return f"fb_{base}"
+
+    result = _regenerate_agent_value_with_llm(
+        original_value="orig",
+        existing_values=["a", "b"],
+        task_description="task",
+        model_id=1,
+        tenant_id="tenant",
+        language="en",
+        system_prompt_key="SYS_KEY",
+        user_prompt_key="USER_KEY",
+        default_system_prompt="sys",
+        default_user_prompt_builder=lambda ctx: "user",
+        fallback_fn=fallback,
+    )
+
+    assert result == "fb_orig"
+    assert used.get("called") is True
+
+
+@pytest.mark.asyncio
+async def test_import_agent_impl_dfs_import_order(monkeypatch):
+    """
+    import_agent_impl should handle DFS ordering and establish relationships correctly.
+    This covers the branch where managed agents are not yet imported (agent_stack.extend path).
+    """
+    # Mock user and tenant
+    monkeypatch.setattr(
+        "backend.services.agent_service.get_current_user_info",
+        lambda authorization: ("user1", "tenant1", "en"),
+        raising=False,
+    )
+
+    # Skip MCP handling by providing no mcp_info and making update_tool_list a no-op
+    from consts.model import ExportAndImportAgentInfo, ExportAndImportDataFormat
+
+    root_agent = ExportAndImportAgentInfo(
+        agent_id=1,
+        name="root",
+        display_name="Root",
+        description="root",
+        business_description="root",
+        max_steps=5,
+        provide_run_summary=False,
+        duty_prompt=None,
+        constraint_prompt=None,
+        few_shots_prompt=None,
+        enabled=True,
+        tools=[],
+        managed_agents=[2],
+    )
+    child_agent = ExportAndImportAgentInfo(
+        agent_id=2,
+        name="child",
+        display_name="Child",
+        description="child",
+        business_description="child",
+        max_steps=5,
+        provide_run_summary=False,
+        duty_prompt=None,
+        constraint_prompt=None,
+        few_shots_prompt=None,
+        enabled=True,
+        tools=[],
+        managed_agents=[],
+    )
+
+    export_data = ExportAndImportDataFormat(
+        agent_id=1,
+        agent_info={"1": root_agent, "2": child_agent},
+        mcp_info=[],
+    )
+
+    # Track import order and relationship creation
+    imported_ids = []
+
+    async def fake_import_agent_by_agent_id(import_agent_info, tenant_id, user_id, skip_duplicate_regeneration=False):
+        # Assign synthetic new IDs based on source id
+        new_id = 100 + import_agent_info.agent_id
+        imported_ids.append(import_agent_info.agent_id)
+        return new_id
+
+    relationships = []
+
+    def fake_insert_related_agent(parent_agent_id, child_agent_id, tenant_id):
+        relationships.append((parent_agent_id, child_agent_id, tenant_id))
+
+    async def fake_update_tool_list(tenant_id, user_id):
+        return None
+
+    monkeypatch.setattr(
+        "backend.services.agent_service.import_agent_by_agent_id",
+        fake_import_agent_by_agent_id,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "backend.services.agent_service.insert_related_agent",
+        fake_insert_related_agent,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "backend.services.agent_service.update_tool_list",
+        fake_update_tool_list,
+        raising=False,
+    )
+
+    # Execute
+    await import_agent_impl(export_data, authorization="Bearer token", force_import=False)
+
+    # Child (2) must be imported before parent (1)
+    assert imported_ids == [2, 1]
+    # Relationship should be created between new IDs 101 (child) and 100 (parent)
+    assert relationships == [(100 + 1, 100 + 2, "tenant1")]
 
 
 # =====================================================================
