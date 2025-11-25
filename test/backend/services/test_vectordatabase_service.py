@@ -138,26 +138,6 @@ def _semantic_search_impl(request, vdb_core):
     }
 
 
-def _hybrid_search_impl(request, vdb_core):
-    start_time = time.time()
-    results = vdb_core.hybrid_search(
-        index_names=request.index_names,
-        query=request.query,
-        top_k=request.top_k,
-        weight_accurate=request.weight_accurate
-    )
-    end_time = time.time()
-    query_time_ms = (end_time - start_time) * 1000
-
-    for result in results:
-        if "scores" in result:
-            result["score_details"] = result.pop("scores")
-
-    return {
-        "results": results,
-        "total": len(results),
-        "query_time_ms": query_time_ms
-    }
 
 
 class TestElasticSearchService(unittest.TestCase):
@@ -187,14 +167,14 @@ class TestElasticSearchService(unittest.TestCase):
             _accurate_search_impl)
         ElasticSearchService.semantic_search = staticmethod(
             _semantic_search_impl)
-        ElasticSearchService.hybrid_search = staticmethod(_hybrid_search_impl)
 
     def tearDown(self):
         """Clean up resources after each test."""
         self.get_embedding_model_patcher.stop()
-        del ElasticSearchService.accurate_search
-        del ElasticSearchService.semantic_search
-        del ElasticSearchService.hybrid_search
+        if hasattr(ElasticSearchService, 'accurate_search'):
+            del ElasticSearchService.accurate_search
+        if hasattr(ElasticSearchService, 'semantic_search'):
+            del ElasticSearchService.semantic_search
 
     @patch('backend.services.vectordatabase_service.create_knowledge_record')
     def test_create_index_success(self, mock_create_knowledge):
@@ -1019,24 +999,17 @@ class TestElasticSearchService(unittest.TestCase):
             index_names=["test_index"], query="test query", top_k=10
         )
 
-    def test_hybrid_search(self):
+    def test_search_hybrid_success(self):
         """
         Test hybrid search (combining semantic and accurate search).
 
         This test verifies that:
-        1. The hybrid_search method correctly calls the core search implementation
+        1. The search_hybrid method correctly calls the core search implementation
         2. The weight parameter for balancing semantic and accurate search is passed correctly
         3. Search results include individual scores for both semantic and accurate searches
         4. The response contains the expected structure with results, total, and timing information
         """
         # Setup
-        search_request = MagicMock()
-        search_request.index_names = ["test_index"]
-        search_request.query = "test query"
-        search_request.top_k = 10
-        search_request.weight_accurate = 0.5
-
-        # Create a mock response directly on the vdb_core instance
         self.mock_vdb_core.hybrid_search.return_value = [
             {
                 "document": {"title": "Doc1", "content": "Content1"},
@@ -1047,8 +1020,12 @@ class TestElasticSearchService(unittest.TestCase):
         ]
 
         # Execute
-        result = ElasticSearchService.hybrid_search(
-            request=search_request,
+        result = ElasticSearchService.search_hybrid(
+            index_names=["test_index"],
+            query="test query",
+            tenant_id="test_tenant",
+            top_k=10,
+            weight_accurate=0.5,
             vdb_core=self.mock_vdb_core
         )
 
@@ -1056,13 +1033,116 @@ class TestElasticSearchService(unittest.TestCase):
         self.assertEqual(len(result["results"]), 1)
         self.assertEqual(result["total"], 1)
         self.assertTrue("query_time_ms" in result)
-        self.assertEqual(result["results"][0]
-                         ["score_details"]["accurate"], 0.85)
-        self.assertEqual(result["results"][0]
-                         ["score_details"]["semantic"], 0.95)
+        self.assertEqual(result["results"][0]["score"], 0.90)
+        self.assertEqual(result["results"][0]["index"], "test_index")
+        self.assertEqual(result["results"][0]["score_details"]["accurate"], 0.85)
+        self.assertEqual(result["results"][0]["score_details"]["semantic"], 0.95)
         self.mock_vdb_core.hybrid_search.assert_called_once_with(
-            index_names=["test_index"], query="test query", top_k=10, weight_accurate=0.5
+            index_names=["test_index"],
+            query_text="test query",
+            embedding_model=self.mock_embedding,
+            top_k=10,
+            weight_accurate=0.5
         )
+
+    def test_search_hybrid_missing_tenant_id(self):
+        """Test search_hybrid raises ValueError when tenant_id is missing."""
+        with self.assertRaises(ValueError) as context:
+            ElasticSearchService.search_hybrid(
+                index_names=["test_index"],
+                query="test query",
+                tenant_id="",
+                top_k=10,
+                weight_accurate=0.5,
+                vdb_core=self.mock_vdb_core
+            )
+        self.assertIn("Tenant ID is required", str(context.exception))
+
+    def test_search_hybrid_empty_query(self):
+        """Test search_hybrid raises ValueError when query is empty."""
+        with self.assertRaises(ValueError) as context:
+            ElasticSearchService.search_hybrid(
+                index_names=["test_index"],
+                query="   ",
+                tenant_id="test_tenant",
+                top_k=10,
+                weight_accurate=0.5,
+                vdb_core=self.mock_vdb_core
+            )
+        self.assertIn("Query text is required", str(context.exception))
+
+    def test_search_hybrid_no_indices(self):
+        """Test search_hybrid raises ValueError when no indices provided."""
+        with self.assertRaises(ValueError) as context:
+            ElasticSearchService.search_hybrid(
+                index_names=[],
+                query="test query",
+                tenant_id="test_tenant",
+                top_k=10,
+                weight_accurate=0.5,
+                vdb_core=self.mock_vdb_core
+            )
+        self.assertIn("At least one index name is required", str(context.exception))
+
+    def test_search_hybrid_invalid_top_k(self):
+        """Test search_hybrid raises ValueError when top_k is invalid."""
+        with self.assertRaises(ValueError) as context:
+            ElasticSearchService.search_hybrid(
+                index_names=["test_index"],
+                query="test query",
+                tenant_id="test_tenant",
+                top_k=0,
+                weight_accurate=0.5,
+                vdb_core=self.mock_vdb_core
+            )
+        self.assertIn("top_k must be greater than 0", str(context.exception))
+
+    def test_search_hybrid_invalid_weight(self):
+        """Test search_hybrid raises ValueError when weight_accurate is invalid."""
+        with self.assertRaises(ValueError) as context:
+            ElasticSearchService.search_hybrid(
+                index_names=["test_index"],
+                query="test query",
+                tenant_id="test_tenant",
+                top_k=10,
+                weight_accurate=1.5,
+                vdb_core=self.mock_vdb_core
+            )
+        self.assertIn("weight_accurate must be between 0 and 1", str(context.exception))
+
+    def test_search_hybrid_no_embedding_model(self):
+        """Test search_hybrid raises ValueError when embedding model is not configured."""
+        # Stop the mock to test the real get_embedding_model
+        self.get_embedding_model_patcher.stop()
+        try:
+            with patch('backend.services.vectordatabase_service.get_embedding_model', return_value=None):
+                with self.assertRaises(ValueError) as context:
+                    ElasticSearchService.search_hybrid(
+                        index_names=["test_index"],
+                        query="test query",
+                        tenant_id="test_tenant",
+                        top_k=10,
+                        weight_accurate=0.5,
+                        vdb_core=self.mock_vdb_core
+                    )
+                self.assertIn("No embedding model configured", str(context.exception))
+        finally:
+            self.get_embedding_model_patcher.start()
+
+    def test_search_hybrid_exception(self):
+        """Test search_hybrid handles exceptions from vdb_core."""
+        self.mock_vdb_core.hybrid_search.side_effect = Exception("Search failed")
+        
+        with self.assertRaises(Exception) as context:
+            ElasticSearchService.search_hybrid(
+                index_names=["test_index"],
+                query="test query",
+                tenant_id="test_tenant",
+                top_k=10,
+                weight_accurate=0.5,
+                vdb_core=self.mock_vdb_core
+            )
+        self.assertIn("Error executing hybrid search", str(context.exception))
 
     def test_health_check_healthy(self):
         """

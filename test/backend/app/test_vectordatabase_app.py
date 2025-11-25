@@ -1231,3 +1231,117 @@ async def test_health_check_validation_exception(vdb_core_mock):
 
         # Verify health_check was called
         mock_health.assert_called_once_with(ANY)
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_success(vdb_core_mock, auth_data):
+    """
+    Test hybrid search endpoint successfully.
+    Verifies that the endpoint returns the expected response when hybrid search succeeds.
+    """
+    # Setup mocks
+    with patch("backend.apps.vectordatabase_app.get_vector_db_core", return_value=vdb_core_mock), \
+            patch("backend.apps.vectordatabase_app.get_current_user_id", return_value=(auth_data["user_id"], auth_data["tenant_id"])), \
+            patch("backend.apps.vectordatabase_app.ElasticSearchService.search_hybrid") as mock_search_hybrid:
+
+        expected_response = {
+            "results": [
+                {
+                    "title": "Doc1",
+                    "content": "Content1",
+                    "score": 0.90,
+                    "index": "test_index",
+                    "score_details": {"accurate": 0.85, "semantic": 0.95}
+                }
+            ],
+            "total": 1,
+            "query_time_ms": 50
+        }
+        mock_search_hybrid.return_value = expected_response
+
+        # Execute request
+        payload = {
+            "index_names": ["test_index"],
+            "query": "test query",
+            "top_k": 10,
+            "weight_accurate": 0.5
+        }
+        response = client.post(
+            "/indices/search/hybrid",
+            json=payload,
+            headers=auth_data["auth_header"]
+        )
+
+        # Verify
+        assert response.status_code == 200
+        assert response.json() == expected_response
+        mock_search_hybrid.assert_called_once_with(
+            index_names=["test_index"],
+            query="test query",
+            tenant_id=auth_data["tenant_id"],
+            top_k=10,
+            weight_accurate=0.5,
+            vdb_core=ANY
+        )
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_value_error(vdb_core_mock, auth_data):
+    """
+    Test hybrid search endpoint with ValueError.
+    Verifies that the endpoint returns 400 BAD_REQUEST when validation fails.
+    """
+    # Setup mocks
+    with patch("backend.apps.vectordatabase_app.get_vector_db_core", return_value=vdb_core_mock), \
+            patch("backend.apps.vectordatabase_app.get_current_user_id", return_value=(auth_data["user_id"], auth_data["tenant_id"])), \
+            patch("backend.apps.vectordatabase_app.ElasticSearchService.search_hybrid") as mock_search_hybrid:
+
+        mock_search_hybrid.side_effect = ValueError("Query text is required")
+
+        # Execute request
+        payload = {
+            "index_names": ["test_index"],
+            "query": "",
+            "top_k": 10,
+            "weight_accurate": 0.5
+        }
+        response = client.post(
+            "/indices/search/hybrid",
+            json=payload,
+            headers=auth_data["auth_header"]
+        )
+
+        # Verify
+        assert response.status_code == 400
+        assert response.json() == {"detail": "Query text is required"}
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_exception(vdb_core_mock, auth_data):
+    """
+    Test hybrid search endpoint with general exception.
+    Verifies that the endpoint returns 500 INTERNAL_SERVER_ERROR when search fails.
+    """
+    # Setup mocks
+    with patch("backend.apps.vectordatabase_app.get_vector_db_core", return_value=vdb_core_mock), \
+            patch("backend.apps.vectordatabase_app.get_current_user_id", return_value=(auth_data["user_id"], auth_data["tenant_id"])), \
+            patch("backend.apps.vectordatabase_app.ElasticSearchService.search_hybrid") as mock_search_hybrid:
+
+        mock_search_hybrid.side_effect = Exception("Search execution failed")
+
+        # Execute request
+        payload = {
+            "index_names": ["test_index"],
+            "query": "test query",
+            "top_k": 10,
+            "weight_accurate": 0.5
+        }
+        response = client.post(
+            "/indices/search/hybrid",
+            json=payload,
+            headers=auth_data["auth_header"]
+        )
+
+        # Verify
+        assert response.status_code == 500
+        assert response.json() == {"detail": "Error executing hybrid search: Search execution failed"}
