@@ -26,7 +26,7 @@ from database.client import minio_client
 from utils.model_name_utils import add_repo_to_name
 from utils.prompt_template_utils import get_agent_prompt_template
 from utils.config_utils import tenant_config_manager, get_model_name_from_config
-from consts.const import LOCAL_MCP_SERVER, MODEL_CONFIG_MAPPING, LANGUAGE
+from consts.const import LOCAL_MCP_SERVER, MODEL_CONFIG_MAPPING, LANGUAGE, DATA_PROCESS_SERVICE
 
 logger = logging.getLogger("create_agent_info")
 logger.setLevel(logging.DEBUG)
@@ -313,8 +313,8 @@ async def join_minio_file_description_to_query(minio_files, query):
     if minio_files and isinstance(minio_files, list):
         file_descriptions = []
         for file in minio_files:
-            if isinstance(file, dict) and "description" in file and file["description"]:
-                file_descriptions.append(file["description"])
+            if isinstance(file, dict) and "url" in file and file["url"] and "name" in file and file["name"]:
+                file_descriptions.append("File S3 URL:" + file["url"] + ", file name:" + file["name"])
 
         if file_descriptions:
             final_query = "User provided some reference files:\n"
