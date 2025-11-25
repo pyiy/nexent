@@ -88,6 +88,12 @@ class NexentAgent:
                                        vlm_model=tool_config.metadata.get("vlm_model", []),
                                        storage_client=tool_config.metadata.get("storage_client", []),
                                        **params)
+            elif class_name == "AnalyzeTextFileTool":
+                tools_obj = tool_class(observer=self.observer,
+                                       llm_model=tool_config.metadata.get("llm_model", []),
+                                       storage_client=tool_config.metadata.get("storage_client", []),
+                                       data_process_service_url=tool_config.metadata.get("data_process_service_url", []),
+                                       **params)
             else:
                 tools_obj = tool_class(**params)
                 if hasattr(tools_obj, 'observer'):
