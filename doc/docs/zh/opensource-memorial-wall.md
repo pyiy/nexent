@@ -477,3 +477,7 @@ xiaofu到此一游，感谢 Nexent 让我踏上了开源之旅！
 ::: adasibi - 2025-11-23
 学习ai很好用，感谢 Nexent 让我踏上了开源之旅！
 :::
+
+::: info aurorahashcat - 2025-11-23
+nexent看起来超棒的自动化智能体构建平台，祝越来越好😀
+:::
