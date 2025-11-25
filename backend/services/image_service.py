@@ -4,11 +4,11 @@ from http import HTTPStatus
 import aiohttp
 
 from consts.const import DATA_PROCESS_SERVICE
+from consts.const import MODEL_CONFIG_MAPPING
+from utils.config_utils import tenant_config_manager, get_model_name_from_config
+
 from nexent import MessageObserver
 from nexent.core.models import OpenAIVLModel
-
-from backend.consts.const import MODEL_CONFIG_MAPPING
-from backend.utils.config_utils import tenant_config_manager, get_model_name_from_config
 
 logger = logging.getLogger("image_service")
 

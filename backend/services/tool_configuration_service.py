@@ -25,9 +25,8 @@ from database.tool_db import (
 from database.user_tenant_db import get_all_tenant_ids
 from services.vectordatabase_service import get_embedding_model, get_vector_db_core
 from services.tenant_config_service import get_selected_knowledge_list
-
-from backend.database.client import minio_client
-from backend.services.image_service import get_vlm_model
+from database.client import minio_client
+from services.image_service import get_vlm_model
 
 logger = logging.getLogger("tool_configuration_service")
 
