@@ -4,9 +4,13 @@ from typing import Dict, Any
 
 import yaml
 
-from consts.const import LANGUAGE
 
 logger = logging.getLogger("prompt_template_utils")
+
+LANGUAGE = {
+    "ZH": "zh",
+    "EN": "en"
+}
 
 # Define template path mapping
 template_paths = {

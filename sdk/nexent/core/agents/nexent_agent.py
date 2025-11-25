@@ -83,11 +83,6 @@ class NexentAgent:
                     "vdb_core", None) if tool_config.metadata else None
                 tools_obj.embedding_model = tool_config.metadata.get(
                     "embedding_model", None) if tool_config.metadata else None
-                tools_obj = tool_class(index_names=tool_config.metadata.get("index_names", []),
-                                       observer=self.observer,
-                                       vdb_core=tool_config.metadata.get("vdb_core", []),
-                                       embedding_model=tool_config.metadata.get("embedding_model", []),
-                                       **params)
             elif class_name == "AnalyzeImageTool":
                 tools_obj = tool_class(observer=self.observer,
                                        vlm_model=tool_config.metadata.get("vlm_model", []),

@@ -17,16 +17,15 @@ from services.vectordatabase_service import (
 from services.tenant_config_service import get_selected_knowledge_list
 from services.remote_mcp_service import get_remote_mcp_server_list
 from services.memory_config_service import build_memory_context
+from services.image_service import get_vlm_model
 from database.agent_db import search_agent_info_by_agent_id, query_sub_agents_id_list
 from database.tool_db import search_tools_for_sub_agent
 from database.model_management_db import get_model_records, get_model_by_model_id
+from database.client import minio_client
 from utils.model_name_utils import add_repo_to_name
 from utils.prompt_template_utils import get_agent_prompt_template
 from utils.config_utils import tenant_config_manager, get_model_name_from_config
 from consts.const import LOCAL_MCP_SERVER, MODEL_CONFIG_MAPPING, LANGUAGE
-
-from backend.database.client import minio_client
-from backend.services.image_service import get_vlm_model
 
 logger = logging.getLogger("create_agent_info")
 logger.setLevel(logging.DEBUG)
