@@ -9,8 +9,6 @@ from typing import List, Optional, AsyncGenerator
 import httpx
 from fastapi import UploadFile
 
-from nexent import MessageObserver
-from nexent.core.models import OpenAILongContextModel
 from agents.preprocess_manager import preprocess_manager
 from consts.const import UPLOAD_FOLDER, MAX_CONCURRENT_UPLOADS, DATA_PROCESS_SERVICE, LANGUAGE, MODEL_CONFIG_MAPPING
 from database.attachment_db import (
@@ -21,11 +19,14 @@ from database.attachment_db import (
     delete_file,
     list_files
 )
-from utils.attachment_utils import convert_image_to_text, convert_long_text_to_text
 from services.vectordatabase_service import ElasticSearchService, get_vector_db_core
+from utils.attachment_utils import convert_image_to_text, convert_long_text_to_text
 from utils.config_utils import tenant_config_manager, get_model_name_from_config
 from utils.prompt_template_utils import get_file_processing_messages_template
 from utils.file_management_utils import save_upload_file
+
+from nexent import MessageObserver
+from nexent.core.models import OpenAILongContextModel
 
 # Create upload directory
 upload_dir = Path(UPLOAD_FOLDER)
