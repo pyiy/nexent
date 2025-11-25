@@ -91,15 +91,24 @@ class TestPromptService(unittest.TestCase):
     @patch('backend.services.prompt_service.generate_system_prompt')
     @patch('backend.services.prompt_service.query_tools_by_ids')
     @patch('backend.services.prompt_service.search_agent_info_by_agent_id')
+    @patch('backend.services.prompt_service.query_all_agent_info_by_tenant_id')
     @patch('backend.services.prompt_service.update_agent')
-    def test_generate_and_save_system_prompt_impl(self, mock_update_agent, mock_search_agent_info,
-                                                  mock_query_tools, mock_generate_system_prompt):
+    def test_generate_and_save_system_prompt_impl(
+        self,
+        mock_update_agent,
+        mock_query_all_agents,
+        mock_search_agent_info,
+        mock_query_tools,
+        mock_generate_system_prompt,
+    ):
         # Setup
         mock_tool1 = {"name": "tool1", "description": "Tool 1 desc",
                       "inputs": "input1", "output_type": "output1"}
         mock_tool2 = {"name": "tool2", "description": "Tool 2 desc",
                       "inputs": "input2", "output_type": "output2"}
         mock_query_tools.return_value = [mock_tool1, mock_tool2]
+        # No existing agents so that duplicate detection path is not triggered
+        mock_query_all_agents.return_value = []
 
         mock_agent1 = {"name": "agent1", "description": "Agent 1 desc"}
         mock_agent2 = {"name": "agent2", "description": "Agent 2 desc"}
@@ -161,8 +170,18 @@ class TestPromptService(unittest.TestCase):
         self.assertEqual(agent_info.business_description, "Test task")
 
     @patch('backend.services.prompt_service.generate_system_prompt')
+    @patch('backend.services.prompt_service.query_all_agent_info_by_tenant_id')
+    @patch('backend.services.prompt_service.get_enabled_sub_agent_description_for_generate_prompt')
+    @patch('backend.services.prompt_service.get_enabled_tool_description_for_generate_prompt')
     @patch('backend.services.prompt_service.update_agent')
-    def test_generate_and_save_system_prompt_impl_create_mode(self, mock_update_agent, mock_generate_system_prompt):
+    def test_generate_and_save_system_prompt_impl_create_mode(
+        self,
+        mock_update_agent,
+        mock_get_enabled_tools,
+        mock_get_enabled_sub_agents,
+        mock_query_all_agents,
+        mock_generate_system_prompt,
+    ):
         """Test generate_and_save_system_prompt_impl in create mode (agent_id=0)"""
         # Setup - Mock the generator to return the expected data structure
         def mock_generator(*args, **kwargs):
@@ -177,6 +196,13 @@ class TestPromptService(unittest.TestCase):
             yield {"type": "few_shots", "content": "Final few shots prompt", "is_complete": True}
 
         mock_generate_system_prompt.side_effect = mock_generator
+        # Simulate no existing agents (no duplicates)
+        mock_query_all_agents.return_value = []
+        # Simulate back-end enabled tools / sub-agents when IDs are empty
+        enabled_tools = [{"name": "db_tool", "description": "DB tool"}]
+        enabled_sub_agents = [{"name": "db_agent", "description": "DB agent"}]
+        mock_get_enabled_tools.return_value = enabled_tools
+        mock_get_enabled_sub_agents.return_value = enabled_sub_agents
 
         # Execute - test as a generator with agent_id=0 (create mode) and empty tool/sub-agent IDs
         result_gen = generate_and_save_system_prompt_impl(
@@ -194,11 +220,11 @@ class TestPromptService(unittest.TestCase):
         # Assert
         self.assertGreater(len(result), 0)
 
-        # Should call generate_system_prompt with empty lists for tools and sub-agents
+        # Should call generate_system_prompt with back-end enabled tools and sub-agents
         mock_generate_system_prompt.assert_called_once_with(
-            [],  # Empty sub_agent_info_list
+            enabled_sub_agents,  # sub_agent_info_list from helper
             "Test task",
-            [],  # Empty tool_info_list
+            enabled_tools,  # tool_info_list from helper
             "tenant456",
             self.test_model_id,
             "zh"

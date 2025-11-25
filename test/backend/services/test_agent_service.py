@@ -2378,7 +2378,8 @@ async def test_import_agent_impl_success_with_mcp(mock_get_current_user_info, mo
     mock_import_agent.assert_called_once_with(
         import_agent_info=agent_info,
         tenant_id="test_tenant",
-        user_id="test_user"
+        user_id="test_user",
+        skip_duplicate_regeneration=False,
     )
 
 
@@ -2685,7 +2686,8 @@ async def test_import_agent_impl_no_mcp_info(mock_get_current_user_info, mock_up
     mock_import_agent.assert_called_once_with(
         import_agent_info=agent_info,
         tenant_id="test_tenant",
-        user_id="test_user"
+        user_id="test_user",
+        skip_duplicate_regeneration=False,
     )
 
 
@@ -3722,7 +3724,7 @@ async def test_generate_stream_with_memory_emits_tokens_and_unregisters(monkeypa
     )
     http_request = Request(scope={"type": "http", "headers": []})
 
-    # Enable memory switch in preview
+    # Enable memory switch in preview (memory enabled)
     monkeypatch.setattr(
         "backend.services.agent_service.build_memory_context",
         MagicMock(return_value=MagicMock(
@@ -3730,7 +3732,7 @@ async def test_generate_stream_with_memory_emits_tokens_and_unregisters(monkeypa
         raising=False,
     )
 
-    # Prepare run returned values
+    # Prepare run returned values (agent_run_info, memory_context)
     monkeypatch.setattr(
         "backend.services.agent_service.prepare_agent_run",
         AsyncMock(return_value=(MagicMock(), MagicMock())),
@@ -3776,8 +3778,10 @@ async def test_generate_stream_with_memory_emits_tokens_and_unregisters(monkeypa
         out.append(d)
 
     # Expect start and done memory tokens then body chunks
-    assert any("memory_search" in s and "<MEM_START>" in s for s in out)
-    assert any("memory_search" in s and "<MEM_DONE>" in s for s in out)
+    from consts.const import MEMORY_SEARCH_START_MSG, MEMORY_SEARCH_DONE_MSG
+
+    assert any("memory_search" in s and MEMORY_SEARCH_START_MSG in s for s in out)
+    assert any("memory_search" in s and MEMORY_SEARCH_DONE_MSG in s for s in out)
     assert "data: bodyA\n\n" in out and "data: bodyB\n\n" in out
     # Unregister must be called
     assert calls["registered"] is not None
@@ -3843,7 +3847,9 @@ async def test_generate_stream_with_memory_fallback_on_failure(monkeypatch):
     ):
         out.append(d)
 
-    assert any("memory_search" in s and "<MEM_FAILED>" in s for s in out)
+    from consts.const import MEMORY_SEARCH_FAIL_MSG
+
+    assert any("memory_search" in s and MEMORY_SEARCH_FAIL_MSG in s for s in out)
     assert "data: fb1\n\n" in out
     assert called["unregistered"]
 

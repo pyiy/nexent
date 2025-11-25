@@ -13,7 +13,15 @@ from database.agent_db import update_agent, search_agent_info_by_agent_id, query
     query_sub_agents_id_list
 from database.model_management_db import get_model_by_model_id
 from database.tool_db import query_tools_by_ids
-from services.agent_service import get_enable_tool_id_by_agent_id
+from services.agent_service import (
+    get_enable_tool_id_by_agent_id,
+    _check_agent_name_duplicate,
+    _check_agent_display_name_duplicate,
+    _regenerate_agent_name_with_llm,
+    _regenerate_agent_display_name_with_llm,
+    _generate_unique_agent_name_with_suffix,
+    _generate_unique_display_name_with_suffix
+)
 from utils.config_utils import get_model_name_from_config
 from utils.prompt_template_utils import get_prompt_generate_prompt_template
 
@@ -157,16 +165,6 @@ def generate_and_save_system_prompt_impl(agent_id: int,
     # 1. Real-time streaming push
     final_results = {"duty": "", "constraint": "", "few_shots": "", "agent_var_name": "", "agent_display_name": "",
                      "agent_description": ""}
-    
-    # Import functions locally to avoid circular import
-    from services.agent_service import (
-        _check_agent_name_duplicate,
-        _check_agent_display_name_duplicate,
-        _regenerate_agent_name_with_llm,
-        _regenerate_agent_display_name_with_llm,
-        _generate_unique_agent_name_with_suffix,
-        _generate_unique_display_name_with_suffix
-    )
     
     # Get all existing agent names and display names for duplicate checking (only if not in create mode)
     all_agents = query_all_agent_info_by_tenant_id(tenant_id)
