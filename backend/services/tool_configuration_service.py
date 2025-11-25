@@ -22,11 +22,12 @@ from database.tool_db import (
     update_tool_table_from_scan_tool_list,
     search_last_tool_instance_by_tool_id,
 )
-from database.user_tenant_db import get_all_tenant_ids
 from database.client import minio_client
+from database.user_tenant_db import get_all_tenant_ids
 from services.file_management_service import get_llm_model
 from services.vectordatabase_service import get_embedding_model, get_vector_db_core
 from services.tenant_config_service import get_selected_knowledge_list
+from services.image_service import get_vlm_model
 
 logger = logging.getLogger("tool_configuration_service")
 
