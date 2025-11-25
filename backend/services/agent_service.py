@@ -885,7 +885,11 @@ async def export_agent_by_agent_id(agent_id: int, tenant_id: str, user_id: str) 
     return agent_info
 
 
-async def import_agent_impl(agent_info: ExportAndImportDataFormat, authorization: str = Header(None)):
+async def import_agent_impl(
+    agent_info: ExportAndImportDataFormat,
+    authorization: str = Header(None),
+    force_import: bool = False
+):
     """
     Import agent using DFS
     """
@@ -951,7 +955,9 @@ async def import_agent_impl(agent_info: ExportAndImportDataFormat, authorization
                 import_agent_info=agent_info.agent_info[str(
                     need_import_agent_id)],
                 tenant_id=tenant_id,
-                user_id=user_id)
+                user_id=user_id,
+                skip_duplicate_regeneration=force_import
+            )
             mapping_agent_id[need_import_agent_id] = new_agent_id
 
             agent_id_set.add(need_import_agent_id)
@@ -966,7 +972,12 @@ async def import_agent_impl(agent_info: ExportAndImportDataFormat, authorization
             agent_stack.extend(managed_agents)
 
 
-async def import_agent_by_agent_id(import_agent_info: ExportAndImportAgentInfo, tenant_id: str, user_id: str):
+async def import_agent_by_agent_id(
+    import_agent_info: ExportAndImportAgentInfo,
+    tenant_id: str,
+    user_id: str,
+    skip_duplicate_regeneration: bool = False
+):
     tool_list = []
 
     # query all tools in the current tenant
@@ -1020,78 +1031,79 @@ async def import_agent_by_agent_id(import_agent_info: ExportAndImportAgentInfo, 
         tenant_id=tenant_id
     )
 
-    # Check for duplicate names and regenerate if needed
+    # Check for duplicate names and regenerate if needed (unless forced import)
     agent_name = import_agent_info.name
     agent_display_name = import_agent_info.display_name
-    
+
     # Get all existing agent names and display names for duplicate checking
     all_agents = query_all_agent_info_by_tenant_id(tenant_id)
     existing_names = [agent.get("name") for agent in all_agents if agent.get("name")]
     existing_display_names = [agent.get("display_name") for agent in all_agents if agent.get("display_name")]
-    
-    # Check and regenerate name if duplicate
-    if _check_agent_name_duplicate(agent_name, tenant_id, agents_cache=all_agents):
-        logger.info(f"Agent name '{agent_name}' already exists, regenerating with LLM")
-        # Get model for regeneration (use business_logic_model_id if available, otherwise use model_id)
-        regeneration_model_id = business_logic_model_id or model_id
-        if regeneration_model_id:
-            try:
-                agent_name = _regenerate_agent_name_with_llm(
-                    original_name=agent_name,
-                    existing_names=existing_names,
-                    task_description=import_agent_info.business_description or import_agent_info.description or "",
-                    model_id=regeneration_model_id,
-                    tenant_id=tenant_id,
-                    language=LANGUAGE["ZH"],  # Default to Chinese, can be enhanced later
-                    agents_cache=all_agents
-                )
-                logger.info(f"Regenerated agent name: '{agent_name}'")
-            except Exception as e:
-                logger.error(f"Failed to regenerate agent name with LLM: {str(e)}, using fallback")
+
+    if not skip_duplicate_regeneration:
+        # Check and regenerate name if duplicate
+        if _check_agent_name_duplicate(agent_name, tenant_id, agents_cache=all_agents):
+            logger.info(f"Agent name '{agent_name}' already exists, regenerating with LLM")
+            # Get model for regeneration (use business_logic_model_id if available, otherwise use model_id)
+            regeneration_model_id = business_logic_model_id or model_id
+            if regeneration_model_id:
+                try:
+                    agent_name = _regenerate_agent_name_with_llm(
+                        original_name=agent_name,
+                        existing_names=existing_names,
+                        task_description=import_agent_info.business_description or import_agent_info.description or "",
+                        model_id=regeneration_model_id,
+                        tenant_id=tenant_id,
+                        language=LANGUAGE["ZH"],  # Default to Chinese, can be enhanced later
+                        agents_cache=all_agents
+                    )
+                    logger.info(f"Regenerated agent name: '{agent_name}'")
+                except Exception as e:
+                    logger.error(f"Failed to regenerate agent name with LLM: {str(e)}, using fallback")
+                    agent_name = _generate_unique_agent_name_with_suffix(
+                        agent_name,
+                        tenant_id=tenant_id,
+                        agents_cache=all_agents
+                    )
+            else:
+                logger.warning("No model available for regeneration, using fallback")
                 agent_name = _generate_unique_agent_name_with_suffix(
                     agent_name,
                     tenant_id=tenant_id,
                     agents_cache=all_agents
                 )
-        else:
-            logger.warning("No model available for regeneration, using fallback")
-            agent_name = _generate_unique_agent_name_with_suffix(
-                agent_name,
-                tenant_id=tenant_id,
-                agents_cache=all_agents
-            )
-    
-    # Check and regenerate display_name if duplicate
-    if _check_agent_display_name_duplicate(agent_display_name, tenant_id, agents_cache=all_agents):
-        logger.info(f"Agent display_name '{agent_display_name}' already exists, regenerating with LLM")
-        # Get model for regeneration (use business_logic_model_id if available, otherwise use model_id)
-        regeneration_model_id = business_logic_model_id or model_id
-        if regeneration_model_id:
-            try:
-                agent_display_name = _regenerate_agent_display_name_with_llm(
-                    original_display_name=agent_display_name,
-                    existing_display_names=existing_display_names,
-                    task_description=import_agent_info.business_description or import_agent_info.description or "",
-                    model_id=regeneration_model_id,
-                    tenant_id=tenant_id,
-                    language=LANGUAGE["ZH"],  # Default to Chinese, can be enhanced later
-                    agents_cache=all_agents
-                )
-                logger.info(f"Regenerated agent display_name: '{agent_display_name}'")
-            except Exception as e:
-                logger.error(f"Failed to regenerate agent display_name with LLM: {str(e)}, using fallback")
+
+        # Check and regenerate display_name if duplicate
+        if _check_agent_display_name_duplicate(agent_display_name, tenant_id, agents_cache=all_agents):
+            logger.info(f"Agent display_name '{agent_display_name}' already exists, regenerating with LLM")
+            # Get model for regeneration (use business_logic_model_id if available, otherwise use model_id)
+            regeneration_model_id = business_logic_model_id or model_id
+            if regeneration_model_id:
+                try:
+                    agent_display_name = _regenerate_agent_display_name_with_llm(
+                        original_display_name=agent_display_name,
+                        existing_display_names=existing_display_names,
+                        task_description=import_agent_info.business_description or import_agent_info.description or "",
+                        model_id=regeneration_model_id,
+                        tenant_id=tenant_id,
+                        language=LANGUAGE["ZH"],  # Default to Chinese, can be enhanced later
+                        agents_cache=all_agents
+                    )
+                    logger.info(f"Regenerated agent display_name: '{agent_display_name}'")
+                except Exception as e:
+                    logger.error(f"Failed to regenerate agent display_name with LLM: {str(e)}, using fallback")
+                    agent_display_name = _generate_unique_display_name_with_suffix(
+                        agent_display_name,
+                        tenant_id=tenant_id,
+                        agents_cache=all_agents
+                    )
+            else:
+                logger.warning("No model available for regeneration, using fallback")
                 agent_display_name = _generate_unique_display_name_with_suffix(
                     agent_display_name,
                     tenant_id=tenant_id,
                     agents_cache=all_agents
                 )
-        else:
-            logger.warning("No model available for regeneration, using fallback")
-            agent_display_name = _generate_unique_display_name_with_suffix(
-                agent_display_name,
-                tenant_id=tenant_id,
-                agents_cache=all_agents
-            )
 
     # create a new agent
     new_agent = create_agent(agent_info={"name": agent_name,

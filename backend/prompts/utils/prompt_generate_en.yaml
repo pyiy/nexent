@@ -259,7 +259,7 @@ AGENT_NAME_REGENERATE_SYSTEM_PROMPT: |-
   Your job is to generate a Python-friendly variable name that keeps the same intent while avoiding duplicates.
 
   #### Constraints
-  1. The name may contain only letters, numbers, and underscores, must start with a letter or underscore, and stay within 30 characters.
+  1. The name may contain only letters, numbers, and underscores, must start with a letter or underscore, ending with "_assistant", and stay within 30 characters.
   2. Keep the new name semantically close to the original one while ensuring it does not duplicate existing names.
   3. Return the variable name only—no explanations or extra symbols.
 
@@ -282,7 +282,7 @@ AGENT_DISPLAY_NAME_REGENERATE_SYSTEM_PROMPT: |-
   You summarize the agent's capability and generate a readable display name that remains unique within the workspace.
 
   #### Constraints
-  1. The name must be concise, easy to read, summarize the agent's responsibility, and stay within 30 characters.
+  1. The name must be concise, easy to read, summarize the agent's responsibility, ending with "Assistant", and stay within 30 characters.
   2. Avoid mentioning specific tool names or adding extra punctuation.
   3. Return only the display name.
 
