@@ -238,6 +238,16 @@
   height: 100%;
 }
 
+.document-chunk-tabs.ant-tabs-left > .ant-tabs-nav {
+  flex: 0 0 32%;
+  max-width: 32%;
+}
+
+.document-chunk-tabs.ant-tabs-left > .ant-tabs-content-holder {
+  flex: 1 1 68%;
+  max-width: 68%;
+}
+
 .document-chunk-tabs .ant-tabs-nav {
   height: 100%;
 }
@@ -245,6 +255,45 @@
 .document-chunk-tabs .ant-tabs-nav-list {
   height: 100%;
   overflow-y: auto;
+}
+
+/* Active tab highlight style for document chunks */
+.document-chunk-tabs .ant-tabs-tab.ant-tabs-tab-active {
+  background-color: rgb(226, 240, 253) !important;
+}
+
+.document-chunk-tabs .ant-tabs-tab.ant-tabs-tab-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: #3b82f6;
+  /* border-radius: 0 2px 2px 0; */
+}
+
+.document-chunk-tabs .ant-tabs-tab.ant-tabs-tab-active::after {
+  content: none;
+}
+
+.document-chunk-tabs .ant-tabs-ink-bar {
+  display: none !important;
+}
+
+.document-chunk-tabs .ant-tabs-tab {
+  position: relative;
+  margin: 4px 1px !important;
+  padding: 8px 12px !important;
+}
+
+.document-chunk-tabs .ant-tabs-tab:hover {
+  background-color: rgb(241, 245, 249);
+}
+
+.chunk-count-badge .ant-badge-count {
+  box-shadow: none;
+  border: none;
 }
 
 /* Styles for Embedding warning modal */
