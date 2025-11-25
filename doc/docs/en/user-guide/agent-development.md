@@ -58,6 +58,7 @@ Nexent allows you to quickly use third-party MCP tools to enrich agent capabilit
 
 1. On the "Select Tools" tab, click "MCP Config" to configure MCP servers in the popup and view configured servers
 2. Enter the server name and URL (currently only SSE protocol is supported)
+   - ⚠️ **Note:** The server name must contain only English letters or digits; spaces, underscores, and other characters are not allowed.
 3. Click "Add" to complete the addition
 
 <div style="display: flex; justify-content: left;">
@@ -65,6 +66,7 @@ Nexent allows you to quickly use third-party MCP tools to enrich agent capabilit
 </div>
 
 Many third-party services such as [ModelScope](https://www.modelscope.cn/mcp) provide MCP services, which you can quickly integrate and use.
+You can also develop your own MCP services and connect them to Nexent; see [MCP Server Development](../mcp-ecosystem/mcp-server-development.md).
 
 ### Custom Tools
 

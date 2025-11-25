@@ -65,7 +65,7 @@ Nexent支持您快速便捷地使用第三方MCP工具，丰富Agent能力。
 </div>
 
 有许多三方服务如 [ModelScope](https://www.modelscope.cn/mcp) 提供了MCP服务，您可以快速接入使用。
-您也可以自行开发MCP服务并接入Nexent使用，
+您也可以自行开发MCP服务并接入Nexent使用，参考文档[MCP 服务开发](../mcp-ecosystem/mcp-server-development.md)。
 
 ### 自定义工具
 
