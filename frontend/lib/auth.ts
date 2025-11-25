@@ -2,8 +2,8 @@
  * Authentication utilities
  */
 
-import { fetchWithErrorHandling } from "@/services/api";
-import { STORAGE_KEYS } from "@/const/auth";
+import { fetchWithErrorHandling, ApiError } from "@/services/api";
+import { STORAGE_KEYS, STATUS_CODES } from "@/const/auth";
 import { Session } from "@/types/auth";
 import { generateAvatarUrl as generateAvatar } from "@/lib/avatar";
 import log from "@/lib/logger";
@@ -26,10 +26,32 @@ export function generateAvatarUrl(email: string): string {
 
 /**
  * Request with authorization headers
+ * Checks token expiration before sending request to prevent sending expired tokens
  */
 export const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   const session = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.SESSION) : null;
   const sessionObj = session ? JSON.parse(session) : null;
+
+  // Check if token is expired before sending request
+  if (sessionObj?.access_token) {
+    const now = Date.now();
+    const expiresAt = sessionObj.expires_at ? sessionObj.expires_at * 1000 : 0;
+    
+    // If token is expired, clear session and throw error
+    if (expiresAt > 0 && expiresAt <= now) {
+      log.warn("Token expired, clearing session before request");
+      removeSessionFromStorage();
+      
+      // Dispatch session expired event
+      if (typeof window !== "undefined" && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('session-expired', {
+          detail: { message: "Login expired, please login again" }
+        }));
+      }
+      
+      throw new ApiError(STATUS_CODES.TOKEN_EXPIRED, "Login expired, please login again");
+    }
+  }
 
   const isFormData = options.body instanceof FormData;
   const headers = {

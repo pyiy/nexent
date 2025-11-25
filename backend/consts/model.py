@@ -175,6 +175,18 @@ class IndexingResponse(BaseModel):
     total_submitted: int
 
 
+class HybridSearchRequest(BaseModel):
+    """Request payload for hybrid knowledge-base searches."""
+    query: str = Field(..., min_length=1,
+                       description="Search query text")
+    index_names: List[str] = Field(..., min_items=1,
+                                   description="List of index names to search")
+    top_k: int = Field(10, ge=1, le=100,
+                       description="Number of results to return")
+    weight_accurate: float = Field(0.5, ge=0.0, le=1.0,
+                                   description="Weight applied to accurate search scores")
+
+
 # Request models
 class ProcessParams(BaseModel):
     chunking_strategy: Optional[str] = "basic"

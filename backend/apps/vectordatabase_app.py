@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Path, Query
 from fastapi.responses import JSONResponse
 
-from consts.model import IndexingResponse
+from consts.model import HybridSearchRequest, IndexingResponse
 from nexent.vector_database.base import VectorDatabaseCore
 from services.vectordatabase_service import (
     ElasticSearchService,
@@ -226,3 +226,32 @@ def get_index_chunks(
             f"Error getting chunks for index '{index_name}': {error_msg}")
         raise HTTPException(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=f"Error getting chunks: {error_msg}")
+
+
+@router.post("/search/hybrid")
+async def hybrid_search(
+        payload: HybridSearchRequest,
+        vdb_core: VectorDatabaseCore = Depends(get_vector_db_core),
+        authorization: Optional[str] = Header(None),
+):
+    """Run a hybrid (accurate + semantic) search across indices."""
+    try:
+        _, tenant_id = get_current_user_id(authorization)
+        result = ElasticSearchService.search_hybrid(
+            index_names=payload.index_names,
+            query=payload.query,
+            tenant_id=tenant_id,
+            top_k=payload.top_k,
+            weight_accurate=payload.weight_accurate,
+            vdb_core=vdb_core,
+        )
+        return JSONResponse(status_code=HTTPStatus.OK, content=result)
+    except ValueError as exc:
+        raise HTTPException(status_code=HTTPStatus.BAD_REQUEST,
+                            detail=str(exc))
+    except Exception as exc:
+        logger.error(f"Hybrid search failed: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            detail=f"Error executing hybrid search: {str(exc)}",
+        )

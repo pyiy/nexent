@@ -16,6 +16,7 @@ import {
   MIN_ACTIVITY_CHECK_INTERVAL_MS,
 } from "@/const/constants";
 import log from "@/lib/logger";
+import { saveView } from "@/lib/viewPersistence";
 
 /**
  * Session management component
@@ -64,6 +65,7 @@ export function SessionListeners() {
       onCancel() {
         // Clear local session state (session already expired on backend)
         clearLocalSession();
+        saveView("home");
         router.push("/");
         setTimeout(() => (modalShownRef.current = false), 500);
       },

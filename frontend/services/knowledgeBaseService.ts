@@ -668,6 +668,55 @@ class KnowledgeBaseService {
       throw new Error("Failed to get chunks");
     }
   }
+
+  // Hybrid search to retrieve chunks via combined semantic and accurate scoring
+  async hybridSearch(
+    indexName: string,
+    query: string,
+    options?: { topK?: number; weightAccurate?: number }
+  ): Promise<{
+    results: any[];
+    total?: number;
+    query_time_ms?: number;
+  }> {
+    try {
+      const response = await fetch(API_ENDPOINTS.knowledgeBase.searchHybrid, {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query,
+          index_names: [indexName],
+          top_k: options?.topK ?? 10,
+          weight_accurate: options?.weightAccurate ?? 0.5,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ||
+            data.message ||
+            `HTTP error! status: ${response.status}`
+        );
+      }
+
+      return {
+        results: Array.isArray(data.results) ? data.results : [],
+        total: data.total,
+        query_time_ms: data.query_time_ms,
+      };
+    } catch (error) {
+      log.error("Failed to execute hybrid search:", error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Failed to execute hybrid search");
+    }
+  }
 }
 
 // Export a singleton instance

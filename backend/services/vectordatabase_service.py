@@ -996,3 +996,66 @@ class ElasticSearchService:
             error_msg = f"Error retrieving chunks from index {index_name}: {str(e)}"
             logger.error(error_msg)
             raise Exception(error_msg)
+
+    @staticmethod
+    def search_hybrid(
+            *,
+            index_names: List[str],
+            query: str,
+            tenant_id: str,
+            top_k: int = 10,
+            weight_accurate: float = 0.5,
+            vdb_core: VectorDatabaseCore = Depends(get_vector_db_core),
+    ):
+        """
+        Execute a hybrid search that blends accurate and semantic scoring.
+        """
+        try:
+            if not tenant_id:
+                raise ValueError("Tenant ID is required for hybrid search")
+            if not query or not query.strip():
+                raise ValueError("Query text is required for hybrid search")
+            if not index_names:
+                raise ValueError("At least one index name is required")
+            if top_k <= 0:
+                raise ValueError("top_k must be greater than 0")
+            if weight_accurate < 0 or weight_accurate > 1:
+                raise ValueError("weight_accurate must be between 0 and 1")
+
+            embedding_model = get_embedding_model(tenant_id)
+            if not embedding_model:
+                raise ValueError(
+                    "No embedding model configured for the current tenant")
+
+            start_time = time.perf_counter()
+            raw_results = vdb_core.hybrid_search(
+                index_names=index_names,
+                query_text=query,
+                embedding_model=embedding_model,
+                top_k=top_k,
+                weight_accurate=weight_accurate,
+            )
+            elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+
+            formatted_results = []
+            for item in raw_results:
+                document = dict(item.get("document", {}))
+                document["score"] = item.get("score")
+                document["index"] = item.get("index")
+                if "scores" in item:
+                    document["score_details"] = item["scores"]
+                formatted_results.append(document)
+
+            return {
+                "results": formatted_results,
+                "total": len(formatted_results),
+                "query_time_ms": elapsed_ms,
+            }
+        except ValueError:
+            raise
+        except Exception as exc:
+            logger.error(
+                f"Hybrid search failed for indices {index_names}: {exc}",
+                exc_info=True,
+            )
+            raise Exception(f"Error executing hybrid search: {str(exc)}")
