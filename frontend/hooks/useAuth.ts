@@ -84,6 +84,21 @@ export function AuthProvider({ children }: { children: (value: AuthContextType) 
       if (storedSession) {
         try {
           const session = JSON.parse(storedSession);
+          
+          // Check if token is expired before setting user
+          if (session?.expires_at) {
+            const now = Date.now();
+            const expiresAt = session.expires_at * 1000;
+            if (expiresAt <= now) {
+              // Token expired, clear session and don't set user
+              log.warn("Token expired on initialization, clearing session");
+              removeSessionFromStorage();
+              setUser(null);
+              setShouldCheckSession(false);
+              return;
+            }
+          }
+          
           if (session?.user) {
             const safeUser: User = {
               id: session.user.id,
