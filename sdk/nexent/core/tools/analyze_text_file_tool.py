@@ -37,16 +37,16 @@ class AnalyzeTextFileTool(Tool):
     inputs = {
         "file_url_list": {
             "type": "array",
-            "description": "List of file URLs (S3, HTTP, or HTTPS). Supports s3://bucket/key, /bucket/key, http://, and https:// URLs. Can also accept a single file URL which will be treated as a list with one element."
+            "description": "List of file URLs (S3, HTTP, or HTTPS). Supports s3://bucket/key, /bucket/key, http://, and https:// URLs."
         },
         "query": {
             "type": "string",
             "description": "User's question to guide the analysis"
         }
     }
-    output_type = "string"
-    category = ToolCategory.FILE.value
-    tool_sign = ToolSign.FILE_OPERATION.value
+    output_type = "array"
+    category = ToolCategory.MULTIMODAL.value
+    tool_sign = ToolSign.MULTIMODAL_OPERATION.value
 
     def __init__(
         self,
@@ -76,16 +76,16 @@ class AnalyzeTextFileTool(Tool):
         self.data_process_service_url = data_process_service_url
         self.mm = LoadSaveObjectManager(storage_client=self.storage_client)
 
-        self.running_prompt_zh = "正在分析文本文件..."
-        self.running_prompt_en = "Analyzing text file..."
+        self.running_prompt_zh = "正在分析文件..."
+        self.running_prompt_en = "Analyzing file..."
         # Dynamically apply the load_object decorator to forward method
         self.forward = self.mm.load_object(input_names=["file_url_list"])(self._forward_impl)
 
     def _forward_impl(
         self,
-        file_url_list: Union[bytes, List[bytes]],
+        file_url_list: List[bytes],
         query: str,
-    ) -> Union[str, List[str]]:
+    ) -> List[str]:
         """
         Analyze text file content using a large language model.
 
@@ -93,13 +93,12 @@ class AnalyzeTextFileTool(Tool):
         the image from S3 URL, HTTP URL, or HTTPS URL and passes bytes to this method.
 
         Args:
-            file_url_list: File bytes or a sequence of file bytes (converted from URLs by the decorator).
-                          The load_object decorator converts URLs to bytes before calling this method.
+            file_url_list: List of file bytes converted from URLs by the decorator.
+                           The load_object decorator converts URLs to bytes before calling this method.
             query: User's question to guide the analysis
 
         Returns:
-            Union[str, List[str]]: Single analysis string for one file or a list
-            of analysis strings that align with the order of the provided files.
+            List[str]: One analysis string per file that aligns with the order
         """
         # Send tool run message
         if self.observer:
@@ -109,19 +108,15 @@ class AnalyzeTextFileTool(Tool):
             self.observer.add_message("", ProcessType.CARD, json.dumps(card_content, ensure_ascii=False))
 
         if file_url_list is None:
-            raise ValueError("file_url_list must contain at least one file")
+            raise ValueError("file_url_list cannot be None")
 
-        if isinstance(file_url_list, (list, tuple)):
-            file_inputs: List[bytes] = list(file_url_list)
-        elif isinstance(file_url_list, bytes):
-            file_inputs = [file_url_list]
-        else:
-            raise ValueError("file_url_list must be bytes or a list/tuple of bytes")
+        if not isinstance(file_url_list, list):
+            raise ValueError("file_url_list must be a list of bytes")
 
         try:
             analysis_results: List[str] = []
 
-            for index, single_file in enumerate(file_inputs, start=1):
+            for index, single_file in enumerate(file_url_list, start=1):
                 logger.info(f"Extracting text content from file #{index}, query: {query}")
                 filename = f"file_{index}.txt"
 
@@ -143,8 +138,6 @@ class AnalyzeTextFileTool(Tool):
                     logger.error(f"Failed to analyze file #{index}: {analysis_error}")
                     analysis_results.append(str(analysis_error))
 
-            if len(analysis_results) == 1:
-                return analysis_results[0]
             return analysis_results
             
         except Exception as e:

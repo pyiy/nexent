@@ -491,6 +491,47 @@ def test_create_local_tool_success(nexent_agent_instance):
     assert result == mock_tool_instance
 
 
+def test_create_local_tool_analyze_text_file_tool(nexent_agent_instance):
+    """Test AnalyzeTextFileTool creation injects observer and metadata."""
+    mock_analyze_tool_class = MagicMock()
+    mock_analyze_tool_instance = MagicMock()
+    mock_analyze_tool_class.return_value = mock_analyze_tool_instance
+
+    tool_config = ToolConfig(
+        class_name="AnalyzeTextFileTool",
+        name="analyze_text_file",
+        description="desc",
+        inputs="{}",
+        output_type="array",
+        params={"prompt": "describe this"},
+        source="local",
+        metadata={
+            "llm_model": "llm_model_obj",
+            "storage_client": "storage_client_obj",
+        },
+    )
+
+    original_value = nexent_agent.__dict__.get("AnalyzeTextFileTool")
+    nexent_agent.__dict__["AnalyzeTextFileTool"] = mock_analyze_tool_class
+
+    try:
+        result = nexent_agent_instance.create_local_tool(tool_config)
+    finally:
+        if original_value is not None:
+            nexent_agent.__dict__["AnalyzeTextFileTool"] = original_value
+        elif "AnalyzeTextFileTool" in nexent_agent.__dict__:
+            del nexent_agent.__dict__["AnalyzeTextFileTool"]
+
+    mock_analyze_tool_class.assert_called_once_with(
+        observer=nexent_agent_instance.observer,
+        llm_model="llm_model_obj",
+        storage_client="storage_client_obj",
+        prompt="describe this",
+        data_process_service_url="https://example.com",
+    )
+    assert result == mock_analyze_tool_instance
+
+
 def test_create_local_tool_class_not_found(nexent_agent_instance):
     """Test create_local_tool raises ValueError when class is not found."""
     tool_config = ToolConfig(
