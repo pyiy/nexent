@@ -1,29 +1,48 @@
 import pytest
 import sys
+import types
+import importlib.util
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch, Mock, PropertyMock
 
-# Mock consts module first to avoid ModuleNotFoundError
-consts_mock = MagicMock()
-consts_mock.const = MagicMock()
-# Set required constants in consts.const
-consts_mock.const.MINIO_ENDPOINT = "http://localhost:9000"
-consts_mock.const.MINIO_ACCESS_KEY = "test_access_key"
-consts_mock.const.MINIO_SECRET_KEY = "test_secret_key"
-consts_mock.const.MINIO_REGION = "us-east-1"
-consts_mock.const.MINIO_DEFAULT_BUCKET = "test-bucket"
-consts_mock.const.POSTGRES_HOST = "localhost"
-consts_mock.const.POSTGRES_USER = "test_user"
-consts_mock.const.NEXENT_POSTGRES_PASSWORD = "test_password"
-consts_mock.const.POSTGRES_DB = "test_db"
-consts_mock.const.POSTGRES_PORT = 5432
-consts_mock.const.DEFAULT_TENANT_ID = "default_tenant"
-consts_mock.const.LOCAL_MCP_SERVER = "http://localhost:5011"
-consts_mock.const.MODEL_CONFIG_MAPPING = {"llm": "llm_config"}
-consts_mock.const.LANGUAGE = {"ZH": "zh"}
+TEST_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = TEST_ROOT.parent
 
-# Add the mocked consts module to sys.modules
-sys.modules['consts'] = consts_mock
-sys.modules['consts.const'] = consts_mock.const
+# Ensure project backend package is found before test/backend
+for _path in (str(PROJECT_ROOT), str(TEST_ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+from test.common.env_test_utils import bootstrap_env
+
+env_state = bootstrap_env()
+consts_const = env_state["mock_const"]
+
+# Utilities ---------------------------------------------------------------
+def _create_stub_module(name: str, **attrs):
+    """Return a lightweight module stub with the provided attributes."""
+    module = types.ModuleType(name)
+    for attr_name, attr_value in attrs.items():
+        setattr(module, attr_name, attr_value)
+    return module
+
+
+# Configure required constants via shared bootstrap env
+consts_const.MINIO_ENDPOINT = "http://localhost:9000"
+consts_const.MINIO_ACCESS_KEY = "test_access_key"
+consts_const.MINIO_SECRET_KEY = "test_secret_key"
+consts_const.MINIO_REGION = "us-east-1"
+consts_const.MINIO_DEFAULT_BUCKET = "test-bucket"
+consts_const.POSTGRES_HOST = "localhost"
+consts_const.POSTGRES_USER = "test_user"
+consts_const.NEXENT_POSTGRES_PASSWORD = "test_password"
+consts_const.POSTGRES_DB = "test_db"
+consts_const.POSTGRES_PORT = 5432
+consts_const.DEFAULT_TENANT_ID = "default_tenant"
+consts_const.LOCAL_MCP_SERVER = "http://localhost:5011"
+consts_const.MODEL_CONFIG_MAPPING = {"llm": "llm_config"}
+consts_const.LANGUAGE = {"ZH": "zh"}
+consts_const.DATA_PROCESS_SERVICE = "https://example.com/data-process"
 
 # Mock utils module
 utils_mock = MagicMock()
@@ -38,6 +57,7 @@ sys.modules['utils.auth_utils'] = utils_mock.auth_utils
 # if the testing environment does not have it available.
 boto3_mock = MagicMock()
 sys.modules['boto3'] = boto3_mock
+sys.modules['dotenv'] = MagicMock(load_dotenv=MagicMock())
 
 # Mock the entire client module
 client_mock = MagicMock()
@@ -49,13 +69,24 @@ client_mock.as_dict = MagicMock()
 
 # Add the mocked client module to sys.modules
 sys.modules['backend.database.client'] = client_mock
+sys.modules['database.client'] = _create_stub_module(
+    "database.client",
+    minio_client=MagicMock(),
+    postgres_client=MagicMock(),
+    db_client=MagicMock(),
+    get_db_session=MagicMock(),
+    as_dict=MagicMock(),
+)
 
 # Mock external dependencies before imports
-sys.modules['nexent.core.utils.observer'] = MagicMock()
+mock_message_observer = MagicMock()
+sys.modules['nexent.core.utils.observer'] = MagicMock(MessageObserver=mock_message_observer)
 sys.modules['nexent.core.agents.agent_model'] = MagicMock()
 sys.modules['smolagents.agents'] = MagicMock()
 sys.modules['smolagents.utils'] = MagicMock()
 sys.modules['services.remote_mcp_service'] = MagicMock()
+database_module = _create_stub_module("database")
+sys.modules['database'] = database_module
 sys.modules['database.agent_db'] = MagicMock()
 sys.modules['database.tool_db'] = MagicMock()
 sys.modules['database.model_management_db'] = MagicMock()
@@ -67,6 +98,31 @@ sys.modules['utils.langchain_utils'] = MagicMock()
 sys.modules['utils.model_name_utils'] = MagicMock()
 sys.modules['langchain_core.tools'] = MagicMock()
 sys.modules['services.memory_config_service'] = MagicMock()
+# Build services module hierarchy with minimal functionality
+services_module = _create_stub_module("services")
+sys.modules['services'] = services_module
+sys.modules['services.image_service'] = _create_stub_module(
+    "services.image_service", get_vlm_model=MagicMock(return_value="stub_vlm")
+)
+sys.modules['services.file_management_service'] = _create_stub_module(
+    "services.file_management_service",
+    get_llm_model=MagicMock(return_value="stub_llm_model"),
+)
+sys.modules['services.tool_configuration_service'] = _create_stub_module(
+    "services.tool_configuration_service",
+    initialize_tools_on_startup=AsyncMock(),
+)
+# Build top-level nexent module to avoid importing the real package
+nexent_module = _create_stub_module(
+    "nexent",
+    MessageObserver=mock_message_observer,
+)
+sys.modules['nexent'] = nexent_module
+
+# Create nested modules for nexent.core to satisfy imports safely
+sys.modules['nexent.core'] = _create_stub_module("nexent.core")
+sys.modules['nexent.core.agents'] = _create_stub_module("nexent.core.agents")
+sys.modules['nexent.core.utils'] = _create_stub_module("nexent.core.utils")
 sys.modules['nexent.memory.memory_service'] = MagicMock()
 
 # Create mock classes that might be imported
@@ -74,7 +130,6 @@ mock_agent_config = MagicMock()
 mock_model_config = MagicMock()
 mock_tool_config = MagicMock()
 mock_agent_run_info = MagicMock()
-mock_message_observer = MagicMock()
 
 sys.modules['nexent.core.agents.agent_model'].AgentConfig = mock_agent_config
 sys.modules['nexent.core.agents.agent_model'].ModelConfig = mock_model_config
@@ -85,7 +140,38 @@ sys.modules['nexent.core.utils.observer'].MessageObserver = mock_message_observe
 # Mock BASE_BUILTIN_MODULES
 sys.modules['smolagents.utils'].BASE_BUILTIN_MODULES = ["os", "sys", "json"]
 
-# Now import the module under test
+# Provide lightweight smolagents package to prevent circular imports
+smolagents_module = _create_stub_module("smolagents")
+smolagents_tools_module = _create_stub_module("smolagents.tools", Tool=MagicMock())
+smolagents_module.tools = smolagents_tools_module
+sys.modules['smolagents'] = smolagents_module
+sys.modules['smolagents.tools'] = smolagents_tools_module
+
+# Ensure real backend.agents.create_agent_info is available and uses our stubs
+backend_pkg = sys.modules.get("backend")
+if backend_pkg is None:
+    backend_pkg = types.ModuleType("backend")
+    backend_pkg.__path__ = [str((TEST_ROOT.parent) / "backend")]
+    sys.modules["backend"] = backend_pkg
+
+agents_pkg = sys.modules.get("backend.agents")
+if agents_pkg is None:
+    agents_pkg = types.ModuleType("backend.agents")
+    agents_pkg.__path__ = [str((TEST_ROOT.parent) / "backend" / "agents")]
+    sys.modules["backend.agents"] = agents_pkg
+    setattr(backend_pkg, "agents", agents_pkg)
+
+create_agent_info_path = (TEST_ROOT.parent / "backend" / "agents" / "create_agent_info.py")
+spec = importlib.util.spec_from_file_location(
+    "backend.agents.create_agent_info", create_agent_info_path
+)
+create_agent_info_module = importlib.util.module_from_spec(spec)
+sys.modules["backend.agents.create_agent_info"] = create_agent_info_module
+assert spec.loader is not None
+spec.loader.exec_module(create_agent_info_module)
+setattr(agents_pkg, "create_agent_info", create_agent_info_module)
+
+# Now import the symbols under test
 from backend.agents.create_agent_info import (
     discover_langchain_tools,
     create_tool_config_list,
@@ -281,6 +367,43 @@ class TestCreateToolConfigList:
             # Check if the last call was for KnowledgeBaseSearchTool
             last_call = mock_tool_config.call_args_list[-1]
             assert last_call[1]['class_name'] == "KnowledgeBaseSearchTool"
+
+    @pytest.mark.asyncio
+    async def test_create_tool_config_list_with_analyze_text_file_tool(self):
+        """Ensure AnalyzeTextFileTool receives text-specific metadata."""
+        mock_tool_instance = MagicMock()
+        mock_tool_instance.class_name = "AnalyzeTextFileTool"
+        mock_tool_config.return_value = mock_tool_instance
+
+        with patch('backend.agents.create_agent_info.discover_langchain_tools', return_value=[]), \
+                patch('backend.agents.create_agent_info.search_tools_for_sub_agent') as mock_search_tools, \
+                patch('backend.agents.create_agent_info.get_llm_model') as mock_get_llm_model, \
+                patch('backend.agents.create_agent_info.minio_client', new_callable=MagicMock) as mock_minio_client:
+
+            mock_search_tools.return_value = [
+                {
+                    "class_name": "AnalyzeTextFileTool",
+                    "name": "analyze_text_file",
+                    "description": "Analyze text file tool",
+                    "inputs": "string",
+                    "output_type": "array",
+                    "params": [{"name": "prompt", "default": "describe"}],
+                    "source": "local",
+                    "usage": None
+                }
+            ]
+            mock_get_llm_model.return_value = "mock_llm_model"
+
+            result = await create_tool_config_list("agent_1", "tenant_1", "user_1")
+
+            assert len(result) == 1
+            assert result[0] is mock_tool_instance
+            mock_get_llm_model.assert_called_once_with(tenant_id="tenant_1")
+            assert mock_tool_instance.metadata == {
+                "llm_model": "mock_llm_model",
+                "storage_client": mock_minio_client,
+                "data_process_service_url": consts_const.DATA_PROCESS_SERVICE,
+            }
 
 
 class TestCreateAgentConfig:

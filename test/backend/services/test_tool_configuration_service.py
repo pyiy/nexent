@@ -1824,5 +1824,246 @@ class TestValidateLocalToolKnowledgeBaseSearch:
             )
 
 
+class TestValidateLocalToolAnalyzeTextFile:
+    """Test cases for _validate_local_tool function with analyze_text_file tool"""
+
+    @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
+    @patch('backend.services.tool_configuration_service.inspect.signature')
+    @patch('backend.services.tool_configuration_service.get_llm_model')
+    @patch('backend.services.tool_configuration_service.minio_client')
+    @patch('backend.services.tool_configuration_service.DATA_PROCESS_SERVICE', "http://data-process-service")
+    def test_validate_local_tool_analyze_text_file_success(self, mock_minio_client, mock_get_llm_model,
+                                                           mock_signature, mock_get_class):
+        """Test successful analyze_text_file tool validation with proper dependencies"""
+        # Mock tool class
+        mock_tool_class = Mock()
+        mock_tool_instance = Mock()
+        mock_tool_instance.forward.return_value = "analyze text file result"
+        mock_tool_class.return_value = mock_tool_instance
+
+        mock_get_class.return_value = mock_tool_class
+
+        # Mock signature for analyze_text_file tool
+        mock_sig = Mock()
+        mock_sig.parameters = {
+            'self': Mock(),
+            'llm_model': Mock(),
+            'storage_client': Mock(),
+            'data_process_service_url': Mock()
+        }
+        mock_signature.return_value = mock_sig
+
+        # Mock dependencies
+        mock_llm_model = Mock()
+        mock_get_llm_model.return_value = mock_llm_model
+
+        from backend.services.tool_configuration_service import _validate_local_tool
+
+        result = _validate_local_tool(
+            "analyze_text_file",
+            {"input": "test input"},
+            {"param": "config"},
+            "tenant1",
+            "user1"
+        )
+
+        assert result == "analyze text file result"
+        mock_get_class.assert_called_once_with("analyze_text_file")
+
+        # Verify analyze_text_file specific parameters were passed
+        expected_params = {
+            "param": "config",
+            "llm_model": mock_llm_model,
+            "storage_client": mock_minio_client,
+            "data_process_service_url": "http://data-process-service",
+        }
+        mock_tool_class.assert_called_once_with(**expected_params)
+        mock_tool_instance.forward.assert_called_once_with(input="test input")
+
+        # Verify service calls
+        mock_get_llm_model.assert_called_once_with(tenant_id="tenant1")
+
+    @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
+    def test_validate_local_tool_analyze_text_file_missing_tenant_id(self, mock_get_class):
+        """Test analyze_text_file tool validation when tenant_id is missing"""
+        mock_tool_class = Mock()
+        mock_get_class.return_value = mock_tool_class
+
+        from backend.services.tool_configuration_service import _validate_local_tool
+
+        with pytest.raises(ToolExecutionException,
+                           match="Tenant ID and User ID are required for analyze_text_file validation"):
+            _validate_local_tool(
+                "analyze_text_file",
+                {"input": "test input"},
+                {"param": "config"},
+                None,  # Missing tenant_id
+                "user1"
+            )
+
+    @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
+    def test_validate_local_tool_analyze_text_file_missing_user_id(self, mock_get_class):
+        """Test analyze_text_file tool validation when user_id is missing"""
+        mock_tool_class = Mock()
+        mock_get_class.return_value = mock_tool_class
+
+        from backend.services.tool_configuration_service import _validate_local_tool
+
+        with pytest.raises(ToolExecutionException,
+                           match="Tenant ID and User ID are required for analyze_text_file validation"):
+            _validate_local_tool(
+                "analyze_text_file",
+                {"input": "test input"},
+                {"param": "config"},
+                "tenant1",
+                None  # Missing user_id
+            )
+
+    @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
+    def test_validate_local_tool_analyze_text_file_missing_both_ids(self, mock_get_class):
+        """Test analyze_text_file tool validation when both tenant_id and user_id are missing"""
+        mock_tool_class = Mock()
+        mock_get_class.return_value = mock_tool_class
+
+        from backend.services.tool_configuration_service import _validate_local_tool
+
+        with pytest.raises(ToolExecutionException,
+                           match="Tenant ID and User ID are required for analyze_text_file validation"):
+            _validate_local_tool(
+                "analyze_text_file",
+                {"input": "test input"},
+                {"param": "config"},
+                None,  # Missing tenant_id
+                None   # Missing user_id
+            )
+
+
+class TestGetLlmModel:
+    """Test cases for get_llm_model function"""
+
+    @patch('backend.services.file_management_service.MODEL_CONFIG_MAPPING', {"llm": "llm_config_key"})
+    @patch('backend.services.file_management_service.MessageObserver')
+    @patch('backend.services.file_management_service.OpenAILongContextModel')
+    @patch('backend.services.file_management_service.get_model_name_from_config')
+    @patch('backend.services.file_management_service.tenant_config_manager')
+    def test_get_llm_model_success(self, mock_tenant_config, mock_get_model_name, mock_openai_model, mock_message_observer):
+        """Test successful LLM model retrieval"""
+        from backend.services.file_management_service import get_llm_model
+
+        # Mock tenant config manager
+        mock_config = {
+            "base_url": "http://api.example.com",
+            "api_key": "test_api_key",
+            "max_tokens": 4096
+        }
+        mock_tenant_config.get_model_config.return_value = mock_config
+
+        # Mock model name
+        mock_get_model_name.return_value = "gpt-4"
+
+        # Mock MessageObserver
+        mock_observer_instance = Mock()
+        mock_message_observer.return_value = mock_observer_instance
+
+        # Mock OpenAILongContextModel
+        mock_model_instance = Mock()
+        mock_openai_model.return_value = mock_model_instance
+
+        # Execute
+        result = get_llm_model("tenant123")
+
+        # Assertions
+        assert result == mock_model_instance
+        mock_tenant_config.get_model_config.assert_called_once_with(
+            key="llm_config_key", tenant_id="tenant123")
+        mock_get_model_name.assert_called_once_with(mock_config)
+        mock_message_observer.assert_called_once()
+        mock_openai_model.assert_called_once_with(
+            observer=mock_observer_instance,
+            model_id="gpt-4",
+            api_base="http://api.example.com",
+            api_key="test_api_key",
+            max_context_tokens=4096
+        )
+
+    @patch('backend.services.file_management_service.MODEL_CONFIG_MAPPING', {"llm": "llm_config_key"})
+    @patch('backend.services.file_management_service.MessageObserver')
+    @patch('backend.services.file_management_service.OpenAILongContextModel')
+    @patch('backend.services.file_management_service.get_model_name_from_config')
+    @patch('backend.services.file_management_service.tenant_config_manager')
+    def test_get_llm_model_with_missing_config_values(self, mock_tenant_config, mock_get_model_name, mock_openai_model, mock_message_observer):
+        """Test get_llm_model with missing config values"""
+        from backend.services.file_management_service import get_llm_model
+
+        # Mock tenant config manager with missing values
+        mock_config = {
+            "base_url": "http://api.example.com"
+            # Missing api_key and max_tokens
+        }
+        mock_tenant_config.get_model_config.return_value = mock_config
+
+        # Mock model name
+        mock_get_model_name.return_value = "gpt-4"
+
+        # Mock MessageObserver
+        mock_observer_instance = Mock()
+        mock_message_observer.return_value = mock_observer_instance
+
+        # Mock OpenAILongContextModel
+        mock_model_instance = Mock()
+        mock_openai_model.return_value = mock_model_instance
+
+        # Execute
+        result = get_llm_model("tenant123")
+
+        # Assertions
+        assert result == mock_model_instance
+        # Verify that get() is used for missing values (returns None)
+        mock_openai_model.assert_called_once()
+        call_kwargs = mock_openai_model.call_args[1]
+        assert call_kwargs["api_key"] is None
+        assert call_kwargs["max_context_tokens"] is None
+
+    @patch('backend.services.file_management_service.MODEL_CONFIG_MAPPING', {"llm": "llm_config_key"})
+    @patch('backend.services.file_management_service.MessageObserver')
+    @patch('backend.services.file_management_service.OpenAILongContextModel')
+    @patch('backend.services.file_management_service.get_model_name_from_config')
+    @patch('backend.services.file_management_service.tenant_config_manager')
+    def test_get_llm_model_with_different_tenant_ids(self, mock_tenant_config, mock_get_model_name, mock_openai_model, mock_message_observer):
+        """Test get_llm_model with different tenant IDs"""
+        from backend.services.file_management_service import get_llm_model
+
+        # Mock tenant config manager
+        mock_config = {
+            "base_url": "http://api.example.com",
+            "api_key": "test_api_key",
+            "max_tokens": 4096
+        }
+        mock_tenant_config.get_model_config.return_value = mock_config
+
+        # Mock model name
+        mock_get_model_name.return_value = "gpt-4"
+
+        # Mock MessageObserver
+        mock_observer_instance = Mock()
+        mock_message_observer.return_value = mock_observer_instance
+
+        # Mock OpenAILongContextModel
+        mock_model_instance = Mock()
+        mock_openai_model.return_value = mock_model_instance
+
+        # Execute with different tenant IDs
+        result1 = get_llm_model("tenant1")
+        result2 = get_llm_model("tenant2")
+
+        # Assertions
+        assert result1 == mock_model_instance
+        assert result2 == mock_model_instance
+        # Verify tenant config was called with different tenant IDs
+        assert mock_tenant_config.get_model_config.call_count == 2
+        assert mock_tenant_config.get_model_config.call_args_list[0][1]["tenant_id"] == "tenant1"
+        assert mock_tenant_config.get_model_config.call_args_list[1][1]["tenant_id"] == "tenant2"
+
+
 if __name__ == '__main__':
     unittest.main()

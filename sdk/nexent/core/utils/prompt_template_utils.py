@@ -4,7 +4,10 @@ from typing import Dict, Any
 
 import yaml
 
-from consts.const import LANGUAGE
+LANGUAGE = {
+    "ZH": "zh",
+    "EN": "en"
+}
 
 logger = logging.getLogger("prompt_template_utils")
 
