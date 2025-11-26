@@ -55,12 +55,12 @@ from services.conversation_management_service import save_conversation_assistant
 from services.memory_config_service import build_memory_context
 from services.remote_mcp_service import add_remote_mcp_server_list
 from services.tool_configuration_service import update_tool_list
-from services.prompt_service import call_llm_for_system_prompt
 from utils.auth_utils import get_current_user_info, get_user_language
 from utils.config_utils import tenant_config_manager
 from utils.memory_utils import build_memory_config
 from utils.thread_utils import submit
 from utils.prompt_template_utils import get_prompt_generate_prompt_template
+from utils.llm_utils import call_llm_for_system_prompt
 
 # Import monitoring utilities
 from utils.monitoring import monitoring_manager

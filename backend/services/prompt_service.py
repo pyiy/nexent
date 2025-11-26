@@ -5,13 +5,11 @@ import threading
 from typing import Optional, List
 
 from jinja2 import StrictUndefined, Template
-from smolagents import OpenAIServerModel
 
-from consts.const import LANGUAGE, MESSAGE_ROLE, THINK_END_PATTERN, THINK_START_PATTERN
+from consts.const import LANGUAGE
 from consts.model import AgentInfoRequest
 from database.agent_db import update_agent, search_agent_info_by_agent_id, query_all_agent_info_by_tenant_id, \
     query_sub_agents_id_list
-from database.model_management_db import get_model_by_model_id
 from database.tool_db import query_tools_by_ids
 from services.agent_service import (
     get_enable_tool_id_by_agent_id,
@@ -22,90 +20,11 @@ from services.agent_service import (
     _generate_unique_agent_name_with_suffix,
     _generate_unique_display_name_with_suffix
 )
-from utils.config_utils import get_model_name_from_config
+from utils.llm_utils import call_llm_for_system_prompt
 from utils.prompt_template_utils import get_prompt_generate_prompt_template
 
 # Configure logging
 logger = logging.getLogger("prompt_service")
-
-
-def _process_thinking_tokens(new_token: str, is_thinking: bool, token_join: list, callback=None) -> bool:
-    """
-    Process tokens to filter out thinking content between <think> and </think> tags
-
-    Args:
-        new_token: Current token from LLM stream
-        is_thinking: Current thinking state
-        token_join: List to accumulate non-thinking tokens
-        callback: Callback function for streaming output
-
-    Returns:
-        bool: updated_is_thinking
-    """
-    # Handle thinking mode
-    if is_thinking:
-        return THINK_END_PATTERN not in new_token
-
-    # Handle start of thinking
-    if THINK_START_PATTERN in new_token:
-        return True
-
-    # Normal token processing
-    token_join.append(new_token)
-    if callback:
-        callback("".join(token_join))
-
-    return False
-
-
-def call_llm_for_system_prompt(model_id: int, user_prompt: str, system_prompt: str, callback=None, tenant_id: str = None) -> str:
-    """
-    Call LLM to generate system prompt
-
-    Args:
-        model_id: select model for generate prompt
-        user_prompt: description of the current task
-        system_prompt: system prompt for the LLM
-        callback: callback function
-        tenant_id: tenant id
-
-    Returns:
-        str: Generated system prompt
-    """
-
-    llm_model_config = get_model_by_model_id(model_id=model_id, tenant_id=tenant_id)
-
-    llm = OpenAIServerModel(
-        model_id=get_model_name_from_config(
-            llm_model_config) if llm_model_config else "",
-        api_base=llm_model_config.get("base_url", ""),
-        api_key=llm_model_config.get("api_key", ""),
-        temperature=0.3,
-        top_p=0.95
-    )
-    messages = [{"role": MESSAGE_ROLE["SYSTEM"], "content": system_prompt},
-                {"role": MESSAGE_ROLE["USER"], "content": user_prompt}]
-    try:
-        completion_kwargs = llm._prepare_completion_kwargs(
-            messages=messages,
-            model=llm.model_id,
-            temperature=0.3,
-            top_p=0.95
-        )
-        current_request = llm.client.chat.completions.create(
-            stream=True, **completion_kwargs)
-        token_join = []
-        is_thinking = False
-        for chunk in current_request:
-            new_token = chunk.choices[0].delta.content
-            if new_token is not None:
-                is_thinking = _process_thinking_tokens(
-                    new_token, is_thinking, token_join, callback
-                )
-        return "".join(token_join)
-    except Exception as e:
-        logger.error(f"Failed to generate prompt from LLM: {str(e)}")
-        raise e
 
 
 def gen_system_prompt_streamable(agent_id: int, model_id: int, task_description: str, user_id: str, tenant_id: str, language: str, tool_ids: Optional[List[int]] = None, sub_agent_ids: Optional[List[int]] = None):
