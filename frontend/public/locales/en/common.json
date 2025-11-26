@@ -188,6 +188,12 @@
   "chatStreamMessage.cancelDislike": "Cancel dislike",
   "chatStreamMessage.dislike": "Dislike",
   "chatStreamMessage.tts": "Text-to-Speech",
+  "chatStreamMessage.imageTextFallbackTitle": "Media (text view)",
+  "chatStreamMessage.videoNotSupported": "Sorry, your browser does not support embedded videos.",
+  "chatStreamMessage.imageLinkUnavailable": "This image link is unavailable",
+  "chatStreamMessage.videoLinkUnavailable": "This video link is unavailable",
+  "chatStreamMessage.imageLoadFailed": "Image failed to load",
+  "chatStreamMessage.videoLoadFailed": "Video failed to load",
 
   "chatRightPanel.imageLoadFailed": "Failed to load image",
   "chatRightPanel.imageProxyError": "Failed to request image proxy service:",

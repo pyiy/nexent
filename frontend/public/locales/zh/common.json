@@ -188,6 +188,12 @@
   "chatStreamMessage.cancelDislike": "取消点踩",
   "chatStreamMessage.dislike": "点踩",
   "chatStreamMessage.tts": "语音播报",
+  "chatStreamMessage.imageTextFallbackTitle": "媒体（文本视图）",
+  "chatStreamMessage.videoNotSupported": "抱歉，您的浏览器不支持嵌入式视频。",
+  "chatStreamMessage.imageLinkUnavailable": "此图片链接不可用",
+  "chatStreamMessage.videoLinkUnavailable": "此视频链接不可用",
+  "chatStreamMessage.imageLoadFailed": "图片加载失败",
+  "chatStreamMessage.videoLoadFailed": "视频加载失败",
 
   "chatRightPanel.imageLoadFailed": "图片加载失败",
   "chatRightPanel.imageProxyError": "请求图片代理服务失败:",
