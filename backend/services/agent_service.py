@@ -55,6 +55,7 @@ from services.conversation_management_service import save_conversation_assistant
 from services.memory_config_service import build_memory_context
 from services.remote_mcp_service import add_remote_mcp_server_list
 from services.tool_configuration_service import update_tool_list
+from services.prompt_service import call_llm_for_system_prompt
 from utils.auth_utils import get_current_user_info, get_user_language
 from utils.config_utils import tenant_config_manager
 from utils.memory_utils import build_memory_config
@@ -306,7 +307,6 @@ def _regenerate_agent_value_with_llm(
 
     for attempt in range(1, max_attempts + 1):
         try:
-            from services.prompt_service import call_llm_for_system_prompt
             regenerated_value = call_llm_for_system_prompt(
                 model_id=model_id,
                 user_prompt=user_prompt,

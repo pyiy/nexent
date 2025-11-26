@@ -165,6 +165,7 @@ FEW_SHOTS_SYSTEM_PROMPT: |-
   
   思考：我已经获得了快速排序的python代码，现在我将生成最终回答。
   快速排序的python代码如下：
+  代码：
   ```<DISPLAY:python>
   def quick_sort(arr):
     if len(arr) <= 1:
