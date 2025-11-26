@@ -5430,9 +5430,12 @@ def test_regenerate_agent_value_with_llm_success(monkeypatch):
     # Ensure the dynamic import `from services.prompt_service import ...` in
     # `_regenerate_agent_value_with_llm` can succeed by registering a fake
     # module in `sys.modules` with the expected attribute.
-    fake_prompt_module = MagicMock()
-    fake_prompt_module.call_llm_for_system_prompt = fake_call_llm
-    sys.modules["services.prompt_service"] = fake_prompt_module
+    monkeypatch.setattr(
+        agent_service,
+        "call_llm_for_system_prompt",
+        fake_call_llm,
+        raising=False,
+    )
 
     result = _regenerate_agent_value_with_llm(
         original_value="old",
@@ -5463,9 +5466,12 @@ def test_regenerate_agent_value_with_llm_fallback_on_error(monkeypatch):
     def failing_llm(*args, **kwargs):
         raise RuntimeError("llm failed")
 
-    fake_prompt_module = MagicMock()
-    fake_prompt_module.call_llm_for_system_prompt = failing_llm
-    sys.modules["services.prompt_service"] = fake_prompt_module
+    monkeypatch.setattr(
+        agent_service,
+        "call_llm_for_system_prompt",
+        failing_llm,
+        raising=False,
+    )
 
     used = {}
 
@@ -5512,9 +5518,12 @@ def test_regenerate_agent_value_with_llm_empty_system_prompt(monkeypatch):
         assert system_prompt == "default_system"
         return "new_name"
 
-    fake_prompt_module = MagicMock()
-    fake_prompt_module.call_llm_for_system_prompt = fake_call_llm
-    sys.modules["services.prompt_service"] = fake_prompt_module
+    monkeypatch.setattr(
+        agent_service,
+        "call_llm_for_system_prompt",
+        fake_call_llm,
+        raising=False,
+    )
 
     result = _regenerate_agent_value_with_llm(
         original_value="old",
@@ -5575,9 +5584,12 @@ def test_regenerate_agent_value_with_llm_empty_user_prompt(monkeypatch):
         assert builder_called["called"], "default_user_prompt_builder should have been called"
         return "new_name"
 
-    fake_prompt_module = MagicMock()
-    fake_prompt_module.call_llm_for_system_prompt = fake_call_llm
-    sys.modules["services.prompt_service"] = fake_prompt_module
+    monkeypatch.setattr(
+        agent_service,
+        "call_llm_for_system_prompt",
+        fake_call_llm,
+        raising=False,
+    )
 
     result = _regenerate_agent_value_with_llm(
         original_value="old",
@@ -5616,9 +5628,12 @@ def test_regenerate_agent_value_with_llm_duplicate_candidate(monkeypatch):
         # On retry, return a unique value
         return "new_unique_name"
 
-    fake_prompt_module = MagicMock()
-    fake_prompt_module.call_llm_for_system_prompt = fake_call_llm
-    sys.modules["services.prompt_service"] = fake_prompt_module
+    monkeypatch.setattr(
+        agent_service,
+        "call_llm_for_system_prompt",
+        fake_call_llm,
+        raising=False,
+    )
 
     result = _regenerate_agent_value_with_llm(
         original_value="old",
@@ -5651,9 +5666,12 @@ def test_regenerate_agent_name_with_llm(monkeypatch):
     def fake_call_llm(model_id, user_prompt, system_prompt, callback, tenant_id):
         return "new_agent_name"
 
-    fake_prompt_module = MagicMock()
-    fake_prompt_module.call_llm_for_system_prompt = fake_call_llm
-    sys.modules["services.prompt_service"] = fake_prompt_module
+    monkeypatch.setattr(
+        agent_service,
+        "call_llm_for_system_prompt",
+        fake_call_llm,
+        raising=False,
+    )
 
     result = agent_service._regenerate_agent_name_with_llm(
         original_name="old_name",
@@ -5682,9 +5700,12 @@ def test_regenerate_agent_display_name_with_llm(monkeypatch):
     def fake_call_llm(model_id, user_prompt, system_prompt, callback, tenant_id):
         return "New Display Name"
 
-    fake_prompt_module = MagicMock()
-    fake_prompt_module.call_llm_for_system_prompt = fake_call_llm
-    sys.modules["services.prompt_service"] = fake_prompt_module
+    monkeypatch.setattr(
+        agent_service,
+        "call_llm_for_system_prompt",
+        fake_call_llm,
+        raising=False,
+    )
 
     result = agent_service._regenerate_agent_display_name_with_llm(
         original_display_name="Old Display Name",
