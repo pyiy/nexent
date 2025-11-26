@@ -119,3 +119,4 @@ class TestAnalyzeImageTool:
             tool._forward_impl([b"img"], "question")
 
         mock_vlm_model.analyze_image.assert_called_once()
+

@@ -1,12 +1,12 @@
 import pytest
 import sys
 import types
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch, Mock, PropertyMock
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+from test.common.env_test_utils import bootstrap_env
+
+env_state = bootstrap_env()
+consts_const = env_state["mock_const"]
 
 # Utilities ---------------------------------------------------------------
 def _create_stub_module(name: str, **attrs):
@@ -17,28 +17,21 @@ def _create_stub_module(name: str, **attrs):
     return module
 
 
-# Mock consts module first to avoid ModuleNotFoundError
-consts_mock = MagicMock()
-consts_mock.const = MagicMock()
-# Set required constants in consts.const
-consts_mock.const.MINIO_ENDPOINT = "http://localhost:9000"
-consts_mock.const.MINIO_ACCESS_KEY = "test_access_key"
-consts_mock.const.MINIO_SECRET_KEY = "test_secret_key"
-consts_mock.const.MINIO_REGION = "us-east-1"
-consts_mock.const.MINIO_DEFAULT_BUCKET = "test-bucket"
-consts_mock.const.POSTGRES_HOST = "localhost"
-consts_mock.const.POSTGRES_USER = "test_user"
-consts_mock.const.NEXENT_POSTGRES_PASSWORD = "test_password"
-consts_mock.const.POSTGRES_DB = "test_db"
-consts_mock.const.POSTGRES_PORT = 5432
-consts_mock.const.DEFAULT_TENANT_ID = "default_tenant"
-consts_mock.const.LOCAL_MCP_SERVER = "http://localhost:5011"
-consts_mock.const.MODEL_CONFIG_MAPPING = {"llm": "llm_config"}
-consts_mock.const.LANGUAGE = {"ZH": "zh"}
-
-# Add the mocked consts module to sys.modules
-sys.modules['consts'] = consts_mock
-sys.modules['consts.const'] = consts_mock.const
+# Configure required constants via shared bootstrap env
+consts_const.MINIO_ENDPOINT = "http://localhost:9000"
+consts_const.MINIO_ACCESS_KEY = "test_access_key"
+consts_const.MINIO_SECRET_KEY = "test_secret_key"
+consts_const.MINIO_REGION = "us-east-1"
+consts_const.MINIO_DEFAULT_BUCKET = "test-bucket"
+consts_const.POSTGRES_HOST = "localhost"
+consts_const.POSTGRES_USER = "test_user"
+consts_const.NEXENT_POSTGRES_PASSWORD = "test_password"
+consts_const.POSTGRES_DB = "test_db"
+consts_const.POSTGRES_PORT = 5432
+consts_const.DEFAULT_TENANT_ID = "default_tenant"
+consts_const.LOCAL_MCP_SERVER = "http://localhost:5011"
+consts_const.MODEL_CONFIG_MAPPING = {"llm": "llm_config"}
+consts_const.LANGUAGE = {"ZH": "zh"}
 
 # Mock utils module
 utils_mock = MagicMock()

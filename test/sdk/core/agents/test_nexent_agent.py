@@ -693,6 +693,46 @@ def test_create_local_tool_analyze_image_tool(nexent_agent_instance):
     assert result == mock_analyze_tool_instance
 
 
+def test_create_local_tool_analyze_image_tool(nexent_agent_instance):
+    """Test AnalyzeImageTool creation injects observer and metadata."""
+    mock_analyze_tool_class = MagicMock()
+    mock_analyze_tool_instance = MagicMock()
+    mock_analyze_tool_class.return_value = mock_analyze_tool_instance
+
+    tool_config = ToolConfig(
+        class_name="AnalyzeImageTool",
+        name="analyze_image",
+        description="desc",
+        inputs="{}",
+        output_type="string",
+        params={"prompt": "describe this"},
+        source="local",
+        metadata={
+            "vlm_model": "vlm_model_obj",
+            "storage_client": "storage_client_obj",
+        },
+    )
+
+    original_value = nexent_agent.__dict__.get("AnalyzeImageTool")
+    nexent_agent.__dict__["AnalyzeImageTool"] = mock_analyze_tool_class
+
+    try:
+        result = nexent_agent_instance.create_local_tool(tool_config)
+    finally:
+        if original_value is not None:
+            nexent_agent.__dict__["AnalyzeImageTool"] = original_value
+        elif "AnalyzeImageTool" in nexent_agent.__dict__:
+            del nexent_agent.__dict__["AnalyzeImageTool"]
+
+    mock_analyze_tool_class.assert_called_once_with(
+        observer=nexent_agent_instance.observer,
+        vlm_model="vlm_model_obj",
+        storage_client="storage_client_obj",
+        prompt="describe this",
+    )
+    assert result == mock_analyze_tool_instance
+
+
 def test_create_local_tool_with_observer_attribute(nexent_agent_instance):
     """Test create_local_tool sets observer attribute on tool if it exists."""
     mock_tool_class = MagicMock()
