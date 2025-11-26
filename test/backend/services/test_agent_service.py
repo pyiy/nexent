@@ -5533,7 +5533,7 @@ def test_regenerate_agent_value_with_llm_empty_system_prompt(monkeypatch):
 
 
 def test_regenerate_agent_value_with_llm_empty_user_prompt(monkeypatch):
-    """_regenerate_agent_value_with_llm should use default_user_prompt_builder when user_prompt is empty."""
+    """_regenerate_agent_value_with_llm should use default_user_prompt_builder when user_prompt is empty (line 302)."""
 
     monkeypatch.setattr(
         agent_service,
@@ -5549,7 +5549,7 @@ def test_regenerate_agent_value_with_llm_empty_user_prompt(monkeypatch):
         # First call is for system_prompt, return non-empty
         if call_count["render_count"] == 1:
             return "system_prompt"
-        # Second call is for user_prompt, return empty
+        # Second call is for user_prompt, return empty string to trigger line 302
         return ""
 
     monkeypatch.setattr(
@@ -5559,9 +5559,20 @@ def test_regenerate_agent_value_with_llm_empty_user_prompt(monkeypatch):
         raising=False,
     )
 
+    builder_called = {"called": False}
+    
+    def default_user_prompt_builder(ctx):
+        builder_called["called"] = True
+        # Verify context is passed correctly
+        assert "task_description" in ctx
+        assert "original_value" in ctx
+        assert "existing_values" in ctx
+        return "default_user"
+
     def fake_call_llm(model_id, user_prompt, system_prompt, callback, tenant_id):
-        # Verify that default_user_prompt_builder was used
+        # Verify that default_user_prompt_builder was used (line 302-303)
         assert user_prompt == "default_user"
+        assert builder_called["called"], "default_user_prompt_builder should have been called"
         return "new_name"
 
     fake_prompt_module = MagicMock()
@@ -5578,10 +5589,11 @@ def test_regenerate_agent_value_with_llm_empty_user_prompt(monkeypatch):
         system_prompt_key="SYS_KEY",
         user_prompt_key="USER_KEY",
         default_system_prompt="system_prompt",
-        default_user_prompt_builder=lambda ctx: "default_user",
+        default_user_prompt_builder=default_user_prompt_builder,
         fallback_fn=lambda base: f"fallback_{base}",
     )
     assert result == "new_name"
+    assert builder_called["called"], "default_user_prompt_builder should have been called to cover line 302"
 
 
 def test_regenerate_agent_value_with_llm_duplicate_candidate(monkeypatch):
@@ -6127,3 +6139,406 @@ def test_check_single_model_availability_returns_empty_for_available_model():
     )
 
     assert reasons == []
+
+
+@pytest.mark.asyncio
+@patch('backend.services.agent_service.create_or_update_tool_by_tool_info')
+@patch('backend.services.agent_service.create_agent')
+@patch('backend.services.agent_service.query_all_tools')
+@patch('backend.services.agent_service._generate_unique_agent_name_with_suffix')
+@patch('backend.services.agent_service._regenerate_agent_name_with_llm')
+@patch('backend.services.agent_service._check_agent_name_duplicate')
+@patch('backend.services.agent_service.query_all_agent_info_by_tenant_id')
+@patch('backend.services.agent_service._resolve_model_with_fallback')
+async def test_import_agent_by_agent_id_duplicate_name_with_llm_success(
+    mock_resolve_model,
+    mock_query_all_agents,
+    mock_check_name_dup,
+    mock_regen_name,
+    mock_generate_unique_name,
+    mock_query_all_tools,
+    mock_create_agent,
+    mock_create_tool
+):
+    """Test import_agent_by_agent_id when agent_name is duplicate and LLM regeneration succeeds (line 1043-1060)."""
+    # Setup
+    mock_query_all_tools.return_value = []
+    mock_resolve_model.side_effect = [1, 2]  # model_id=1, business_logic_model_id=2
+    mock_query_all_agents.return_value = [{"name": "duplicate_name", "display_name": "Display"}]
+    mock_check_name_dup.return_value = True  # Name is duplicate
+    mock_regen_name.return_value = "regenerated_name"
+    mock_create_agent.return_value = {"agent_id": 456}
+
+    agent_info = ExportAndImportAgentInfo(
+        agent_id=123,
+        name="duplicate_name",
+        display_name="Test Display",
+        description="Test",
+        business_description="Test business",
+        max_steps=5,
+        provide_run_summary=True,
+        duty_prompt="",
+        constraint_prompt="",
+        few_shots_prompt="",
+        enabled=True,
+        tools=[],
+        managed_agents=[],
+        model_id=1,
+        model_name="Model1",
+        business_logic_model_id=2,
+        business_logic_model_name="Model2"
+    )
+
+    # Execute
+    result = await import_agent_by_agent_id(
+        import_agent_info=agent_info,
+        tenant_id="test_tenant",
+        user_id="test_user",
+        skip_duplicate_regeneration=False
+    )
+
+    # Assert
+    assert result == 456
+    mock_check_name_dup.assert_called_once()
+    mock_regen_name.assert_called_once()
+    mock_create_agent.assert_called_once()
+    # Verify regenerated name was used
+    assert mock_create_agent.call_args[1]["agent_info"]["name"] == "regenerated_name"
+
+
+@pytest.mark.asyncio
+@patch('backend.services.agent_service.create_or_update_tool_by_tool_info')
+@patch('backend.services.agent_service.create_agent')
+@patch('backend.services.agent_service.query_all_tools')
+@patch('backend.services.agent_service._generate_unique_agent_name_with_suffix')
+@patch('backend.services.agent_service._regenerate_agent_name_with_llm')
+@patch('backend.services.agent_service._check_agent_name_duplicate')
+@patch('backend.services.agent_service.query_all_agent_info_by_tenant_id')
+@patch('backend.services.agent_service._resolve_model_with_fallback')
+async def test_import_agent_by_agent_id_duplicate_name_llm_failure_fallback(
+    mock_resolve_model,
+    mock_query_all_agents,
+    mock_check_name_dup,
+    mock_regen_name,
+    mock_generate_unique_name,
+    mock_query_all_tools,
+    mock_create_agent,
+    mock_create_tool
+):
+    """Test import_agent_by_agent_id when agent_name is duplicate, LLM regeneration fails, uses fallback (line 1061-1067)."""
+    # Setup
+    mock_query_all_tools.return_value = []
+    mock_resolve_model.side_effect = [1, 2]
+    mock_query_all_agents.return_value = [{"name": "duplicate_name", "display_name": "Display"}]
+    mock_check_name_dup.return_value = True
+    mock_regen_name.side_effect = Exception("LLM failed")
+    mock_generate_unique_name.return_value = "fallback_name_1"
+    mock_create_agent.return_value = {"agent_id": 456}
+
+    agent_info = ExportAndImportAgentInfo(
+        agent_id=123,
+        name="duplicate_name",
+        display_name="Test Display",
+        description="Test",
+        business_description="Test business",
+        max_steps=5,
+        provide_run_summary=True,
+        duty_prompt="",
+        constraint_prompt="",
+        few_shots_prompt="",
+        enabled=True,
+        tools=[],
+        managed_agents=[],
+        model_id=1,
+        model_name="Model1",
+        business_logic_model_id=2,
+        business_logic_model_name="Model2"
+    )
+
+    # Execute
+    result = await import_agent_by_agent_id(
+        import_agent_info=agent_info,
+        tenant_id="test_tenant",
+        user_id="test_user",
+        skip_duplicate_regeneration=False
+    )
+
+    # Assert
+    assert result == 456
+    mock_regen_name.assert_called_once()
+    mock_generate_unique_name.assert_called_once()
+    mock_create_agent.assert_called_once()
+    # Verify fallback name was used
+    assert mock_create_agent.call_args[1]["agent_info"]["name"] == "fallback_name_1"
+
+
+@pytest.mark.asyncio
+@patch('backend.services.agent_service.create_or_update_tool_by_tool_info')
+@patch('backend.services.agent_service.create_agent')
+@patch('backend.services.agent_service.query_all_tools')
+@patch('backend.services.agent_service._generate_unique_agent_name_with_suffix')
+@patch('backend.services.agent_service._regenerate_agent_name_with_llm')
+@patch('backend.services.agent_service._check_agent_name_duplicate')
+@patch('backend.services.agent_service.query_all_agent_info_by_tenant_id')
+@patch('backend.services.agent_service._resolve_model_with_fallback')
+async def test_import_agent_by_agent_id_duplicate_name_no_model_fallback(
+    mock_resolve_model,
+    mock_query_all_agents,
+    mock_check_name_dup,
+    mock_regen_name,
+    mock_generate_unique_name,
+    mock_query_all_tools,
+    mock_create_agent,
+    mock_create_tool
+):
+    """Test import_agent_by_agent_id when agent_name is duplicate but no model available, uses fallback (line 1068-1074)."""
+    # Setup
+    mock_query_all_tools.return_value = []
+    mock_resolve_model.side_effect = [None, None]  # No models available
+    mock_query_all_agents.return_value = [{"name": "duplicate_name", "display_name": "Display"}]
+    mock_check_name_dup.return_value = True
+    mock_generate_unique_name.return_value = "fallback_name_2"
+    mock_create_agent.return_value = {"agent_id": 456}
+
+    agent_info = ExportAndImportAgentInfo(
+        agent_id=123,
+        name="duplicate_name",
+        display_name="Test Display",
+        description="Test",
+        business_description="Test business",
+        max_steps=5,
+        provide_run_summary=True,
+        duty_prompt="",
+        constraint_prompt="",
+        few_shots_prompt="",
+        enabled=True,
+        tools=[],
+        managed_agents=[],
+        model_id=None,
+        model_name=None,
+        business_logic_model_id=None,
+        business_logic_model_name=None
+    )
+
+    # Execute
+    result = await import_agent_by_agent_id(
+        import_agent_info=agent_info,
+        tenant_id="test_tenant",
+        user_id="test_user",
+        skip_duplicate_regeneration=False
+    )
+
+    # Assert
+    assert result == 456
+    mock_check_name_dup.assert_called_once()
+    mock_regen_name.assert_not_called()  # Should not call LLM when no model
+    mock_generate_unique_name.assert_called_once()
+    mock_create_agent.assert_called_once()
+    # Verify fallback name was used
+    assert mock_create_agent.call_args[1]["agent_info"]["name"] == "fallback_name_2"
+
+
+@pytest.mark.asyncio
+@patch('backend.services.agent_service.create_or_update_tool_by_tool_info')
+@patch('backend.services.agent_service.create_agent')
+@patch('backend.services.agent_service.query_all_tools')
+@patch('backend.services.agent_service._generate_unique_display_name_with_suffix')
+@patch('backend.services.agent_service._regenerate_agent_display_name_with_llm')
+@patch('backend.services.agent_service._check_agent_display_name_duplicate')
+@patch('backend.services.agent_service._check_agent_name_duplicate')
+@patch('backend.services.agent_service.query_all_agent_info_by_tenant_id')
+@patch('backend.services.agent_service._resolve_model_with_fallback')
+async def test_import_agent_by_agent_id_duplicate_display_name_with_llm_success(
+    mock_resolve_model,
+    mock_query_all_agents,
+    mock_check_name_dup,
+    mock_check_display_dup,
+    mock_regen_display,
+    mock_generate_unique_display,
+    mock_query_all_tools,
+    mock_create_agent,
+    mock_create_tool
+):
+    """Test import_agent_by_agent_id when agent_display_name is duplicate and LLM regeneration succeeds (line 1077-1092)."""
+    # Setup
+    mock_query_all_tools.return_value = []
+    mock_resolve_model.side_effect = [1, 2]
+    mock_query_all_agents.return_value = [{"name": "name1", "display_name": "duplicate_display"}]
+    mock_check_name_dup.return_value = False  # Name is not duplicate
+    mock_check_display_dup.return_value = True  # Display name is duplicate
+    mock_regen_display.return_value = "regenerated_display"
+    mock_create_agent.return_value = {"agent_id": 456}
+
+    agent_info = ExportAndImportAgentInfo(
+        agent_id=123,
+        name="unique_name",
+        display_name="duplicate_display",
+        description="Test",
+        business_description="Test business",
+        max_steps=5,
+        provide_run_summary=True,
+        duty_prompt="",
+        constraint_prompt="",
+        few_shots_prompt="",
+        enabled=True,
+        tools=[],
+        managed_agents=[],
+        model_id=1,
+        model_name="Model1",
+        business_logic_model_id=2,
+        business_logic_model_name="Model2"
+    )
+
+    # Execute
+    result = await import_agent_by_agent_id(
+        import_agent_info=agent_info,
+        tenant_id="test_tenant",
+        user_id="test_user",
+        skip_duplicate_regeneration=False
+    )
+
+    # Assert
+    assert result == 456
+    mock_check_display_dup.assert_called_once()
+    mock_regen_display.assert_called_once()
+    mock_create_agent.assert_called_once()
+    # Verify regenerated display name was used
+    assert mock_create_agent.call_args[1]["agent_info"]["display_name"] == "regenerated_display"
+
+
+@pytest.mark.asyncio
+@patch('backend.services.agent_service.create_or_update_tool_by_tool_info')
+@patch('backend.services.agent_service.create_agent')
+@patch('backend.services.agent_service.query_all_tools')
+@patch('backend.services.agent_service._generate_unique_display_name_with_suffix')
+@patch('backend.services.agent_service._regenerate_agent_display_name_with_llm')
+@patch('backend.services.agent_service._check_agent_display_name_duplicate')
+@patch('backend.services.agent_service._check_agent_name_duplicate')
+@patch('backend.services.agent_service.query_all_agent_info_by_tenant_id')
+@patch('backend.services.agent_service._resolve_model_with_fallback')
+async def test_import_agent_by_agent_id_duplicate_display_name_llm_failure_fallback(
+    mock_resolve_model,
+    mock_query_all_agents,
+    mock_check_name_dup,
+    mock_check_display_dup,
+    mock_regen_display,
+    mock_generate_unique_display,
+    mock_query_all_tools,
+    mock_create_agent,
+    mock_create_tool
+):
+    """Test import_agent_by_agent_id when agent_display_name is duplicate, LLM regeneration fails, uses fallback (line 1093-1099)."""
+    # Setup
+    mock_query_all_tools.return_value = []
+    mock_resolve_model.side_effect = [1, 2]
+    mock_query_all_agents.return_value = [{"name": "name1", "display_name": "duplicate_display"}]
+    mock_check_name_dup.return_value = False
+    mock_check_display_dup.return_value = True
+    mock_regen_display.side_effect = Exception("LLM failed")
+    mock_generate_unique_display.return_value = "fallback_display_1"
+    mock_create_agent.return_value = {"agent_id": 456}
+
+    agent_info = ExportAndImportAgentInfo(
+        agent_id=123,
+        name="unique_name",
+        display_name="duplicate_display",
+        description="Test",
+        business_description="Test business",
+        max_steps=5,
+        provide_run_summary=True,
+        duty_prompt="",
+        constraint_prompt="",
+        few_shots_prompt="",
+        enabled=True,
+        tools=[],
+        managed_agents=[],
+        model_id=1,
+        model_name="Model1",
+        business_logic_model_id=2,
+        business_logic_model_name="Model2"
+    )
+
+    # Execute
+    result = await import_agent_by_agent_id(
+        import_agent_info=agent_info,
+        tenant_id="test_tenant",
+        user_id="test_user",
+        skip_duplicate_regeneration=False
+    )
+
+    # Assert
+    assert result == 456
+    mock_regen_display.assert_called_once()
+    mock_generate_unique_display.assert_called_once()
+    mock_create_agent.assert_called_once()
+    # Verify fallback display name was used
+    assert mock_create_agent.call_args[1]["agent_info"]["display_name"] == "fallback_display_1"
+
+
+@pytest.mark.asyncio
+@patch('backend.services.agent_service.create_or_update_tool_by_tool_info')
+@patch('backend.services.agent_service.create_agent')
+@patch('backend.services.agent_service.query_all_tools')
+@patch('backend.services.agent_service._generate_unique_display_name_with_suffix')
+@patch('backend.services.agent_service._regenerate_agent_display_name_with_llm')
+@patch('backend.services.agent_service._check_agent_display_name_duplicate')
+@patch('backend.services.agent_service._check_agent_name_duplicate')
+@patch('backend.services.agent_service.query_all_agent_info_by_tenant_id')
+@patch('backend.services.agent_service._resolve_model_with_fallback')
+async def test_import_agent_by_agent_id_duplicate_display_name_no_model_fallback(
+    mock_resolve_model,
+    mock_query_all_agents,
+    mock_check_name_dup,
+    mock_check_display_dup,
+    mock_regen_display,
+    mock_generate_unique_display,
+    mock_query_all_tools,
+    mock_create_agent,
+    mock_create_tool
+):
+    """Test import_agent_by_agent_id when agent_display_name is duplicate but no model available, uses fallback (line 1100-1106)."""
+    # Setup
+    mock_query_all_tools.return_value = []
+    mock_resolve_model.side_effect = [None, None]  # No models available
+    mock_query_all_agents.return_value = [{"name": "name1", "display_name": "duplicate_display"}]
+    mock_check_name_dup.return_value = False
+    mock_check_display_dup.return_value = True
+    mock_generate_unique_display.return_value = "fallback_display_2"
+    mock_create_agent.return_value = {"agent_id": 456}
+
+    agent_info = ExportAndImportAgentInfo(
+        agent_id=123,
+        name="unique_name",
+        display_name="duplicate_display",
+        description="Test",
+        business_description="Test business",
+        max_steps=5,
+        provide_run_summary=True,
+        duty_prompt="",
+        constraint_prompt="",
+        few_shots_prompt="",
+        enabled=True,
+        tools=[],
+        managed_agents=[],
+        model_id=None,
+        model_name=None,
+        business_logic_model_id=None,
+        business_logic_model_name=None
+    )
+
+    # Execute
+    result = await import_agent_by_agent_id(
+        import_agent_info=agent_info,
+        tenant_id="test_tenant",
+        user_id="test_user",
+        skip_duplicate_regeneration=False
+    )
+
+    # Assert
+    assert result == 456
+    mock_check_display_dup.assert_called_once()
+    mock_regen_display.assert_not_called()  # Should not call LLM when no model
+    mock_generate_unique_display.assert_called_once()
+    mock_create_agent.assert_called_once()
+    # Verify fallback display name was used
+    assert mock_create_agent.call_args[1]["agent_info"]["display_name"] == "fallback_display_2"

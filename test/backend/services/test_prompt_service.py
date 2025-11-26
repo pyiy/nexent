@@ -485,6 +485,129 @@ class TestPromptService(unittest.TestCase):
         mock_check_display_dup.assert_called_once()
         mock_update_agent.assert_called_once()
 
+    @patch('backend.services.prompt_service.update_agent')
+    @patch('backend.services.prompt_service._generate_unique_display_name_with_suffix')
+    @patch('backend.services.prompt_service._regenerate_agent_display_name_with_llm')
+    @patch('backend.services.prompt_service._check_agent_display_name_duplicate')
+    @patch('backend.services.prompt_service._check_agent_name_duplicate')
+    @patch('backend.services.prompt_service.query_all_agent_info_by_tenant_id')
+    @patch('backend.services.prompt_service.generate_system_prompt')
+    @patch('backend.services.prompt_service.query_tools_by_ids')
+    @patch('backend.services.prompt_service.search_agent_info_by_agent_id')
+    def test_generate_and_save_system_prompt_impl_display_name_complete_with_duplicate(
+        self,
+        mock_search_agent_info,
+        mock_query_tools,
+        mock_generate_system_prompt,
+        mock_query_all_agents,
+        mock_check_name_dup,
+        mock_check_display_dup,
+        mock_regen_display,
+        mock_generate_unique_display,
+        mock_update_agent,
+    ):
+        """Test agent_display_name path when is_complete is True and duplicate exists, regenerates with LLM (line 235-250)."""
+        # Setup
+        mock_query_tools.return_value = []
+        mock_search_agent_info.return_value = {}
+        mock_query_all_agents.return_value = [{"display_name": "Test Agent", "agent_id": 999}]
+        mock_check_name_dup.return_value = False
+        mock_check_display_dup.return_value = True  # Duplicate exists
+        mock_regen_display.return_value = "Regenerated Display Name"
+        mock_generate_unique_display.return_value = "fallback_display_1"
+
+        # Mock generator output - display_name with is_complete=True to test line 235
+        def mock_gen(*args, **kwargs):
+            yield {"type": "duty", "content": "duty content", "is_complete": True}
+            yield {"type": "agent_display_name", "content": "Test Agent", "is_complete": True}
+
+        mock_generate_system_prompt.side_effect = mock_gen
+
+        # Execute
+        result = list(generate_and_save_system_prompt_impl(
+            agent_id=123,
+            model_id=1,
+            task_description="Task",
+            user_id="u",
+            tenant_id="t",
+            language="zh",
+            tool_ids=[1],
+            sub_agent_ids=[10],
+        ))
+
+        # Assert - should yield regenerated display_name
+        disp_items = [r for r in result if r["type"] == "agent_display_name"]
+        self.assertEqual(len(disp_items), 1)
+        self.assertEqual(disp_items[0]["content"], "Regenerated Display Name")
+        self.assertTrue(disp_items[0].get("is_complete", False))
+        
+        # Should check for duplicate and regenerate
+        mock_check_display_dup.assert_called_once()
+        mock_regen_display.assert_called_once()
+        mock_update_agent.assert_called_once()
+
+    @patch('backend.services.prompt_service.update_agent')
+    @patch('backend.services.prompt_service._generate_unique_display_name_with_suffix')
+    @patch('backend.services.prompt_service._regenerate_agent_display_name_with_llm')
+    @patch('backend.services.prompt_service._check_agent_display_name_duplicate')
+    @patch('backend.services.prompt_service._check_agent_name_duplicate')
+    @patch('backend.services.prompt_service.query_all_agent_info_by_tenant_id')
+    @patch('backend.services.prompt_service.generate_system_prompt')
+    @patch('backend.services.prompt_service.query_tools_by_ids')
+    @patch('backend.services.prompt_service.search_agent_info_by_agent_id')
+    def test_generate_and_save_system_prompt_impl_display_name_llm_failure_fallback(
+        self,
+        mock_search_agent_info,
+        mock_query_tools,
+        mock_generate_system_prompt,
+        mock_query_all_agents,
+        mock_check_name_dup,
+        mock_check_display_dup,
+        mock_regen_display,
+        mock_generate_unique_display,
+        mock_update_agent,
+    ):
+        """Test agent_display_name path when is_complete is True, duplicate exists, LLM regeneration fails, uses fallback (line 235-250)."""
+        # Setup
+        mock_query_tools.return_value = []
+        mock_search_agent_info.return_value = {}
+        mock_query_all_agents.return_value = [{"display_name": "Test Agent", "agent_id": 999}]
+        mock_check_name_dup.return_value = False
+        mock_check_display_dup.return_value = True  # Duplicate exists
+        mock_regen_display.side_effect = Exception("LLM failed")
+        mock_generate_unique_display.return_value = "fallback_display_2"
+
+        # Mock generator output - display_name with is_complete=True to test line 235
+        def mock_gen(*args, **kwargs):
+            yield {"type": "duty", "content": "duty content", "is_complete": True}
+            yield {"type": "agent_display_name", "content": "Test Agent", "is_complete": True}
+
+        mock_generate_system_prompt.side_effect = mock_gen
+
+        # Execute
+        result = list(generate_and_save_system_prompt_impl(
+            agent_id=123,
+            model_id=1,
+            task_description="Task",
+            user_id="u",
+            tenant_id="t",
+            language="zh",
+            tool_ids=[1],
+            sub_agent_ids=[10],
+        ))
+
+        # Assert - should yield fallback display_name
+        disp_items = [r for r in result if r["type"] == "agent_display_name"]
+        self.assertEqual(len(disp_items), 1)
+        self.assertEqual(disp_items[0]["content"], "fallback_display_2")
+        self.assertTrue(disp_items[0].get("is_complete", False))
+        
+        # Should check for duplicate, try LLM regeneration, then use fallback
+        mock_check_display_dup.assert_called_once()
+        mock_regen_display.assert_called_once()
+        mock_generate_unique_display.assert_called_once()
+        mock_update_agent.assert_called_once()
+
     @patch('backend.services.prompt_service.generate_and_save_system_prompt_impl')
     def test_gen_system_prompt_streamable(self, mock_generate_impl):
         """Test gen_system_prompt_streamable function"""
