@@ -366,6 +366,125 @@ class TestPromptService(unittest.TestCase):
         mock_generate_unique_display.assert_called_once()
         mock_update_agent.assert_called_once()
 
+    @patch('backend.services.prompt_service.update_agent')
+    @patch('backend.services.prompt_service._check_agent_display_name_duplicate')
+    @patch('backend.services.prompt_service._check_agent_name_duplicate')
+    @patch('backend.services.prompt_service.query_all_agent_info_by_tenant_id')
+    @patch('backend.services.prompt_service.generate_system_prompt')
+    @patch('backend.services.prompt_service.query_tools_by_ids')
+    @patch('backend.services.prompt_service.search_agent_info_by_agent_id')
+    def test_generate_and_save_system_prompt_impl_name_fields_incomplete(
+        self,
+        mock_search_agent_info,
+        mock_query_tools,
+        mock_generate_system_prompt,
+        mock_query_all_agents,
+        mock_check_name_dup,
+        mock_check_display_dup,
+        mock_update_agent,
+    ):
+        """When agent_var_name or agent_display_name is_complete is False, skip duplicate checking (line 193 else branch)."""
+        # Setup
+        mock_query_tools.return_value = []
+        mock_search_agent_info.return_value = {}
+        mock_query_all_agents.return_value = []
+
+        # Mock generator output with incomplete name fields first, then complete ones
+        def mock_gen(*args, **kwargs):
+            yield {"type": "duty", "content": "duty content", "is_complete": False}
+            # Incomplete name fields - should not trigger duplicate checking (line 193 condition is False)
+            yield {"type": "agent_var_name", "content": "test_agent", "is_complete": False}
+            yield {"type": "agent_display_name", "content": "Test Agent", "is_complete": False}
+            # Complete name fields - should trigger duplicate checking (line 193 condition is True)
+            yield {"type": "agent_var_name", "content": "test_agent_final", "is_complete": True}
+            yield {"type": "agent_display_name", "content": "Test Agent Final", "is_complete": True}
+
+        mock_generate_system_prompt.side_effect = mock_gen
+        mock_check_name_dup.return_value = False
+        mock_check_display_dup.return_value = False
+
+        # Execute
+        result = list(generate_and_save_system_prompt_impl(
+            agent_id=123,
+            model_id=1,
+            task_description="Task",
+            user_id="u",
+            tenant_id="t",
+            language="zh",
+            tool_ids=[1],
+            sub_agent_ids=[10],
+        ))
+
+        # Assert - incomplete name fields should NOT be yielded (they are skipped)
+        # Only complete name fields should be yielded
+        var_items = [r for r in result if r["type"] == "agent_var_name"]
+        disp_items = [r for r in result if r["type"] == "agent_display_name"]
+        
+        # Should only have complete items (incomplete ones are not yielded)
+        self.assertEqual(len(var_items), 1)
+        self.assertEqual(len(disp_items), 1)
+        self.assertTrue(var_items[0].get("is_complete", False))
+        self.assertTrue(disp_items[0].get("is_complete", False))
+        
+        # Duplicate checking should only be called for complete items
+        mock_check_name_dup.assert_called_once()
+        mock_check_display_dup.assert_called_once()
+        mock_update_agent.assert_called_once()
+
+    @patch('backend.services.prompt_service.update_agent')
+    @patch('backend.services.prompt_service._check_agent_display_name_duplicate')
+    @patch('backend.services.prompt_service._check_agent_name_duplicate')
+    @patch('backend.services.prompt_service.query_all_agent_info_by_tenant_id')
+    @patch('backend.services.prompt_service.generate_system_prompt')
+    @patch('backend.services.prompt_service.query_tools_by_ids')
+    @patch('backend.services.prompt_service.search_agent_info_by_agent_id')
+    def test_generate_and_save_system_prompt_impl_display_name_complete_no_duplicate(
+        self,
+        mock_search_agent_info,
+        mock_query_tools,
+        mock_generate_system_prompt,
+        mock_query_all_agents,
+        mock_check_name_dup,
+        mock_check_display_dup,
+        mock_update_agent,
+    ):
+        """Test agent_display_name path when is_complete is True and no duplicate (line 235)."""
+        # Setup
+        mock_query_tools.return_value = []
+        mock_search_agent_info.return_value = {}
+        mock_query_all_agents.return_value = []
+        mock_check_name_dup.return_value = False
+        mock_check_display_dup.return_value = False
+
+        # Mock generator output - only display_name with is_complete=True to test line 235
+        def mock_gen(*args, **kwargs):
+            yield {"type": "duty", "content": "duty content", "is_complete": True}
+            yield {"type": "agent_display_name", "content": "Test Agent", "is_complete": True}
+
+        mock_generate_system_prompt.side_effect = mock_gen
+
+        # Execute
+        result = list(generate_and_save_system_prompt_impl(
+            agent_id=123,
+            model_id=1,
+            task_description="Task",
+            user_id="u",
+            tenant_id="t",
+            language="zh",
+            tool_ids=[1],
+            sub_agent_ids=[10],
+        ))
+
+        # Assert - should yield display_name without regeneration (no duplicate)
+        disp_items = [r for r in result if r["type"] == "agent_display_name"]
+        self.assertEqual(len(disp_items), 1)
+        self.assertEqual(disp_items[0]["content"], "Test Agent")
+        self.assertTrue(disp_items[0].get("is_complete", False))
+        
+        # Should check for duplicate but not regenerate
+        mock_check_display_dup.assert_called_once()
+        mock_update_agent.assert_called_once()
+
     @patch('backend.services.prompt_service.generate_and_save_system_prompt_impl')
     def test_gen_system_prompt_streamable(self, mock_generate_impl):
         """Test gen_system_prompt_streamable function"""

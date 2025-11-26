@@ -5302,6 +5302,49 @@ def test_check_agent_value_duplicate_with_and_without_exclude():
     )
 
 
+@patch('backend.services.agent_service.query_all_agent_info_by_tenant_id')
+def test_check_agent_value_duplicate_empty_value(mock_query_all):
+    """_check_agent_value_duplicate should return False when value is empty."""
+    # Test empty string
+    assert not agent_service._check_agent_value_duplicate(
+        "name", "", tenant_id="t", agents_cache=[]
+    )
+    # Test None value
+    assert not agent_service._check_agent_value_duplicate(
+        "name", None, tenant_id="t", agents_cache=[]
+    )
+    # Should not call query_all_agent_info_by_tenant_id when value is empty
+    mock_query_all.assert_not_called()
+
+
+@patch('backend.services.agent_service.query_all_agent_info_by_tenant_id')
+def test_check_agent_value_duplicate_cache_none(mock_query_all):
+    """_check_agent_value_duplicate should query database when agents_cache is None."""
+    mock_query_all.return_value = [
+        {"agent_id": 1, "name": "agent_one"},
+        {"agent_id": 2, "name": "agent_two"},
+    ]
+
+    # Should query database when cache is None
+    assert agent_service._check_agent_value_duplicate(
+        "name", "agent_one", tenant_id="t", agents_cache=None
+    )
+    mock_query_all.assert_called_once_with("t")
+
+    # Reset mock
+    mock_query_all.reset_mock()
+    mock_query_all.return_value = [
+        {"agent_id": 1, "name": "agent_one"},
+        {"agent_id": 2, "name": "agent_two"},
+    ]
+
+    # Should query database when cache is None and no duplicate found
+    assert not agent_service._check_agent_value_duplicate(
+        "name", "agent_three", tenant_id="t", agents_cache=None
+    )
+    mock_query_all.assert_called_once_with("t")
+
+
 def test_generate_unique_value_with_suffix_success():
     """_generate_unique_value_with_suffix should find first available suffix."""
 
@@ -5446,6 +5489,203 @@ def test_regenerate_agent_value_with_llm_fallback_on_error(monkeypatch):
 
     assert result == "fb_orig"
     assert used.get("called") is True
+
+
+def test_regenerate_agent_value_with_llm_empty_system_prompt(monkeypatch):
+    """_regenerate_agent_value_with_llm should use default_system_prompt when system_prompt is empty."""
+
+    monkeypatch.setattr(
+        agent_service,
+        "get_prompt_generate_prompt_template",
+        lambda lang: {},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        agent_service,
+        "_render_prompt_template",
+        lambda template_str, **kwargs: "",  # Return empty string
+        raising=False,
+    )
+
+    def fake_call_llm(model_id, user_prompt, system_prompt, callback, tenant_id):
+        # Verify that default_system_prompt was used
+        assert system_prompt == "default_system"
+        return "new_name"
+
+    fake_prompt_module = MagicMock()
+    fake_prompt_module.call_llm_for_system_prompt = fake_call_llm
+    sys.modules["services.prompt_service"] = fake_prompt_module
+
+    result = _regenerate_agent_value_with_llm(
+        original_value="old",
+        existing_values=["existing"],
+        task_description="task",
+        model_id=1,
+        tenant_id="tenant",
+        language="en",
+        system_prompt_key="SYS_KEY",
+        user_prompt_key="USER_KEY",
+        default_system_prompt="default_system",
+        default_user_prompt_builder=lambda ctx: "user",
+        fallback_fn=lambda base: f"fallback_{base}",
+    )
+    assert result == "new_name"
+
+
+def test_regenerate_agent_value_with_llm_empty_user_prompt(monkeypatch):
+    """_regenerate_agent_value_with_llm should use default_user_prompt_builder when user_prompt is empty."""
+
+    monkeypatch.setattr(
+        agent_service,
+        "get_prompt_generate_prompt_template",
+        lambda lang: {},
+        raising=False,
+    )
+
+    call_count = {"render_count": 0}
+
+    def mock_render(template_str, **kwargs):
+        call_count["render_count"] += 1
+        # First call is for system_prompt, return non-empty
+        if call_count["render_count"] == 1:
+            return "system_prompt"
+        # Second call is for user_prompt, return empty
+        return ""
+
+    monkeypatch.setattr(
+        agent_service,
+        "_render_prompt_template",
+        mock_render,
+        raising=False,
+    )
+
+    def fake_call_llm(model_id, user_prompt, system_prompt, callback, tenant_id):
+        # Verify that default_user_prompt_builder was used
+        assert user_prompt == "default_user"
+        return "new_name"
+
+    fake_prompt_module = MagicMock()
+    fake_prompt_module.call_llm_for_system_prompt = fake_call_llm
+    sys.modules["services.prompt_service"] = fake_prompt_module
+
+    result = _regenerate_agent_value_with_llm(
+        original_value="old",
+        existing_values=["existing"],
+        task_description="task",
+        model_id=1,
+        tenant_id="tenant",
+        language="en",
+        system_prompt_key="SYS_KEY",
+        user_prompt_key="USER_KEY",
+        default_system_prompt="system_prompt",
+        default_user_prompt_builder=lambda ctx: "default_user",
+        fallback_fn=lambda base: f"fallback_{base}",
+    )
+    assert result == "new_name"
+
+
+def test_regenerate_agent_value_with_llm_duplicate_candidate(monkeypatch):
+    """_regenerate_agent_value_with_llm should raise ValueError when generated candidate is duplicate."""
+
+    monkeypatch.setattr(
+        agent_service,
+        "get_prompt_generate_prompt_template",
+        lambda lang: {},
+        raising=False,
+    )
+
+    attempt_count = {"count": 0}
+
+    def fake_call_llm(model_id, user_prompt, system_prompt, callback, tenant_id):
+        attempt_count["count"] += 1
+        # Return a value that exists in existing_values
+        if attempt_count["count"] == 1:
+            return "existing"  # This is a duplicate
+        # On retry, return a unique value
+        return "new_unique_name"
+
+    fake_prompt_module = MagicMock()
+    fake_prompt_module.call_llm_for_system_prompt = fake_call_llm
+    sys.modules["services.prompt_service"] = fake_prompt_module
+
+    result = _regenerate_agent_value_with_llm(
+        original_value="old",
+        existing_values=["existing", "another"],
+        task_description="task",
+        model_id=1,
+        tenant_id="tenant",
+        language="en",
+        system_prompt_key="SYS_KEY",
+        user_prompt_key="USER_KEY",
+        default_system_prompt="sys",
+        default_user_prompt_builder=lambda ctx: "user",
+        fallback_fn=lambda base: f"fallback_{base}",
+    )
+    # Should retry and eventually return a unique value
+    assert result == "new_unique_name"
+    assert attempt_count["count"] == 2
+
+
+def test_regenerate_agent_name_with_llm(monkeypatch):
+    """_regenerate_agent_name_with_llm should call _regenerate_agent_value_with_llm with correct parameters."""
+
+    monkeypatch.setattr(
+        agent_service,
+        "get_prompt_generate_prompt_template",
+        lambda lang: {},
+        raising=False,
+    )
+
+    def fake_call_llm(model_id, user_prompt, system_prompt, callback, tenant_id):
+        return "new_agent_name"
+
+    fake_prompt_module = MagicMock()
+    fake_prompt_module.call_llm_for_system_prompt = fake_call_llm
+    sys.modules["services.prompt_service"] = fake_prompt_module
+
+    result = agent_service._regenerate_agent_name_with_llm(
+        original_name="old_name",
+        existing_names=["existing1", "existing2"],
+        task_description="task desc",
+        model_id=1,
+        tenant_id="tenant",
+        language="en",
+        agents_cache=[],
+        exclude_agent_id=None
+    )
+
+    assert result == "new_agent_name"
+
+
+def test_regenerate_agent_display_name_with_llm(monkeypatch):
+    """_regenerate_agent_display_name_with_llm should call _regenerate_agent_value_with_llm with correct parameters."""
+
+    monkeypatch.setattr(
+        agent_service,
+        "get_prompt_generate_prompt_template",
+        lambda lang: {},
+        raising=False,
+    )
+
+    def fake_call_llm(model_id, user_prompt, system_prompt, callback, tenant_id):
+        return "New Display Name"
+
+    fake_prompt_module = MagicMock()
+    fake_prompt_module.call_llm_for_system_prompt = fake_call_llm
+    sys.modules["services.prompt_service"] = fake_prompt_module
+
+    result = agent_service._regenerate_agent_display_name_with_llm(
+        original_display_name="Old Display Name",
+        existing_display_names=["Display1", "Display2"],
+        task_description="task desc",
+        model_id=1,
+        tenant_id="tenant",
+        language="en",
+        agents_cache=[],
+        exclude_agent_id=None
+    )
+
+    assert result == "New Display Name"
 
 
 @pytest.mark.asyncio
