@@ -250,12 +250,12 @@ export function getScoreColor(score: number): string {
   }
   
   // Scores 90% and above: gradient from light green to dark green
-  // Map 90-100% to color range: #95de64 (light green) to #52c41a (dark green)
+  // Map 90-100% to color range: #A8E6B2 (light green) to #39C651 (dark green)
   const normalized = (percentage - 90) / 10; // 0 to 1 for 90-100%
   
   // Interpolate between light green (#95de64) and dark green (#52c41a)
-  const r1 = 0x95, g1 = 0xde, b1 = 0x64; // Light green
-  const r2 = 0x52, g2 = 0xc4, b2 = 0x1a; // Dark green
+  const r1 = 0xa8, g1 = 0xe6, b1 = 0xb2; // Light green
+  const r2 = 0x39, g2 = 0xc6, b2 = 0x51; // Dark green
   
   const r = Math.round(r1 + (r2 - r1) * normalized);
   const g = Math.round(g1 + (g2 - g1) * normalized);

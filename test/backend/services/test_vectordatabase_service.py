@@ -3,7 +3,7 @@ import sys
 import os
 import time
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, ANY
 # Mock MinioClient before importing modules that use it
 from unittest.mock import patch
 import numpy as np
@@ -1697,6 +1697,117 @@ class TestElasticSearchService(unittest.TestCase):
             )
 
         self.assertIn("Error retrieving chunks from index kb-index: boom", str(exc.exception))
+
+    def test_create_chunk_builds_payload_and_calls_core(self):
+        """
+        Test create_chunk builds payload and delegates to vdb_core.create_chunk.
+        """
+        from types import SimpleNamespace
+
+        self.mock_vdb_core.create_chunk.return_value = {"id": "chunk-1"}
+        chunk_request = SimpleNamespace(
+            chunk_id=None,
+            title="My title",
+            filename="file.txt",
+            path_or_url="doc-1",
+            content="hello world",
+            metadata={"lang": "en"},
+        )
+
+        result = ElasticSearchService.create_chunk(
+            index_name="kb-index",
+            chunk_request=chunk_request,
+            vdb_core=self.mock_vdb_core,
+            user_id="user-1",
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["chunk_id"], "chunk-1")
+        self.mock_vdb_core.create_chunk.assert_called_once()
+        # create_chunk is called positionally: (index_name, chunk_payload)
+        _, payload = self.mock_vdb_core.create_chunk.call_args[0]
+        # Base fields
+        self.assertEqual(payload["content"], "hello world")
+        self.assertEqual(payload["path_or_url"], "doc-1")
+        self.assertEqual(payload["filename"], "file.txt")
+        self.assertEqual(payload["title"], "My title")
+        self.assertEqual(payload["created_by"], "user-1")
+        # Metadata merged
+        self.assertEqual(payload["lang"], "en")
+        self.assertIn("id", payload)
+
+    def test_update_chunk_builds_payload_and_calls_core(self):
+        """
+        Test update_chunk builds update payload and delegates to vdb_core.update_chunk.
+        """
+
+        class DummyUpdate:
+            def __init__(self, **fields):
+                self._fields = fields
+                # Expose metadata attribute like real Pydantic model
+                self.metadata = fields.get("metadata")
+
+            def dict(self, exclude_unset=True, exclude=None):
+                data = dict(self._fields)
+                if exclude:
+                    for key in exclude:
+                        data.pop(key, None)
+                return data
+
+        self.mock_vdb_core.update_chunk.return_value = {"id": "chunk-1"}
+        chunk_request = DummyUpdate(
+            content="updated",
+            filename="updated.txt",
+            metadata={"lang": "en"},
+        )
+
+        result = ElasticSearchService.update_chunk(
+            index_name="kb-index",
+            chunk_id="chunk-1",
+            chunk_request=chunk_request,
+            vdb_core=self.mock_vdb_core,
+            user_id="user-1",
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["chunk_id"], "chunk-1")
+        self.mock_vdb_core.update_chunk.assert_called_once_with(
+            "kb-index", "chunk-1", ANY
+        )
+
+    def test_delete_chunk_success(self):
+        """
+        Test delete_chunk returns success when vdb_core.delete_chunk is True.
+        """
+        self.mock_vdb_core.delete_chunk.return_value = True
+
+        result = ElasticSearchService.delete_chunk(
+            index_name="kb-index",
+            chunk_id="chunk-1",
+            vdb_core=self.mock_vdb_core,
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["chunk_id"], "chunk-1")
+        self.mock_vdb_core.delete_chunk.assert_called_once_with(
+            "kb-index", "chunk-1"
+        )
+
+    def test_delete_chunk_not_found_raises_value_error(self):
+        """
+        Test delete_chunk raises ValueError when vdb_core.delete_chunk returns False.
+        """
+        self.mock_vdb_core.delete_chunk.return_value = False
+
+        with self.assertRaises(Exception) as exc:
+            ElasticSearchService.delete_chunk(
+                index_name="kb-index",
+                chunk_id="missing",
+                vdb_core=self.mock_vdb_core,
+            )
+
+        self.assertIn(
+            "Error deleting chunk: Chunk missing not found in index kb-index", str(exc.exception))
 
     @patch('backend.services.vectordatabase_service.get_knowledge_info_by_tenant_id')
     @patch('fastapi.Response')
