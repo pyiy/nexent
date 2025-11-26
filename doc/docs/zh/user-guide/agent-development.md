@@ -55,15 +55,17 @@
 
 Nexent支持您快速便捷地使用第三方MCP工具，丰富Agent能力。
 
-1. 在“选择Agent的工具”页签右侧，点击“MCP配置”，可在弹窗中进行MCP服务器的配置，查看已配置的MCP服务器
+1. 在"选择Agent的工具"页签右侧，点击"MCP配置"，可在弹窗中进行MCP服务器的配置，查看已配置的MCP服务器
 2. 输入服务器名称和服务器URL（目前仅支持SSE协议）
-3. 点击“添加”按钮，即可完成添加
+   - ⚠️ **注意**：服务器名称只能包含英文字母和数字，不能包含空格、下划线等其他字符
+3. 点击"添加"按钮，即可完成添加
 
 <div style="display: flex; justify-content: left;">
   <img src="./assets/agent/mcp.png" style="width: 80%; height: auto;" />
 </div>
 
 有许多三方服务如 [ModelScope](https://www.modelscope.cn/mcp) 提供了MCP服务，您可以快速接入使用。
+您也可以自行开发MCP服务并接入Nexent使用，参考文档[MCP 服务开发](../mcp-ecosystem/mcp-server-development.md)。
 
 ### 自定义工具
 
