@@ -1276,15 +1276,18 @@ class TestJoinMinioFileDescriptionToQuery:
     async def test_join_minio_file_description_to_query_with_files(self):
         """Test case with file descriptions"""
         minio_files = [
-            {"description": "File 1 description"},
-            {"description": "File 2 description"},
-            {"no_description": "should be ignored"}
+            {"url": "/nexent/1.pdf", "name": "1.pdf"},
+            {"url": "/nexent/2.pdf", "name": "2.pdf"},
+            {"url": "/nexent/3.pdf", "name": "3.pdf"},
         ]
         query = "test query"
 
         result = await join_minio_file_description_to_query(minio_files, query)
 
-        expected = "User provided some reference files:\nFile 1 description\nFile 2 description\n\nUser wants to answer questions based on the above information: test query"
+        expected = ("User provided some reference files:\nFile S3 URL: s3://nexent/1.pdf, file name:1.pdf\n"
+                    "File S3 URL: s3://nexent/2.pdf, file name:2.pdf\n"
+                    "File S3 URL: s3://nexent/3.pdf, file name:3.pdf\n\n"
+                    'User wants to answer questions based on the above information: test query')
         assert result == expected
 
     @pytest.mark.asyncio

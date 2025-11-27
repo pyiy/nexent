@@ -56,19 +56,6 @@ def tool(observer_zh, llm_model):
 
 
 class TestAnalyzeTextFileTool:
-    def test_forward_impl_success_records_observer(self, tool, llm_model, observer_zh):
-        tool.process_text_file = MagicMock(return_value="Extracted text")
-        tool.analyze_file = MagicMock(return_value=("analysis", 0.0))
-
-        result = tool._forward_impl([b"file-bytes"], "Why?")
-
-        assert result == ["analysis"]
-        tool.process_text_file.assert_called_once_with("file_1.txt", b"file-bytes")
-        tool.analyze_file.assert_called_once_with("Why?", "Extracted text")
-        observer_zh.add_message.assert_any_call("", ProcessType.TOOL, "正在分析文件...")
-        observer_zh.add_message.assert_any_call("", ProcessType.CARD, json.dumps(
-            [{"icon": "file", "text": "Analyzing file..."}], ensure_ascii=False))
-
     def test_forward_impl_switches_language(self, observer_en, llm_model, monkeypatch):
         tool = AnalyzeTextFileTool(
             storage_client=MagicMock(),

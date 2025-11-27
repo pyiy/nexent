@@ -279,15 +279,8 @@ async def preprocess_files_generator(
                 if "error" in file_data:
                     raise Exception(file_data["error"])
 
-                if file_data["ext"] in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']:
-                    # description = await process_image_file(query, file_data["filename"], file_data["content"], tenant_id, language)
-                    # truncation_percentage = None
-                    description = ""
-                    truncation_percentage = None
-                else:
-                    # description, truncation_percentage = await process_text_file(query, file_data["filename"], file_data["content"], tenant_id, language)
-                    description = ""
-                    truncation_percentage = None
+                description = ""
+                truncation_percentage = None
                 file_descriptions.append(description)
 
                 # Send processing result for each file

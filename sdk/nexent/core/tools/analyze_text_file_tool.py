@@ -104,8 +104,6 @@ class AnalyzeTextFileTool(Tool):
         if self.observer:
             running_prompt = self.running_prompt_zh if self.observer.lang == "zh" else self.running_prompt_en
             self.observer.add_message("", ProcessType.TOOL, running_prompt)
-            card_content = [{"icon": "file", "text": f"Analyzing file..."}]
-            self.observer.add_message("", ProcessType.CARD, json.dumps(card_content, ensure_ascii=False))
 
         if file_url_list is None:
             raise ValueError("file_url_list cannot be None")
