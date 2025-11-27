@@ -1,21 +1,24 @@
 import sys
-import os
+from pathlib import Path
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-# Dynamically determine the backend path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-backend_dir = os.path.abspath(os.path.join(current_dir, "../../../backend"))
-sys.path.append(backend_dir)
+TEST_ROOT = Path(__file__).resolve().parents[2]
+if str(TEST_ROOT) not in sys.path:
+    sys.path.append(str(TEST_ROOT))
 
-# Mock the consts.const module before importing the image_app module
-mock_const = MagicMock()
-mock_const.DATA_PROCESS_SERVICE = "http://mock-data-process-service"
-sys.modules['consts.const'] = mock_const
+from test.common.env_test_utils import bootstrap_env
 
-# Now import the module after mocking dependencies
-from fastapi.testclient import TestClient
+helpers_env = bootstrap_env()
+
+
+helpers_env["mock_const"].DATA_PROCESS_SERVICE = "http://mock-data-process-service"
+helpers_env["mock_const"].MODEL_CONFIG_MAPPING = {"vlm": "vlm_model_config"}
+mock_const = helpers_env["mock_const"]
+
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from backend.apps.image_app import router
 
 # Create a FastAPI app and include the router for testing
@@ -56,7 +59,7 @@ async def test_proxy_image_success(monkeypatch):
     mock_client_session.__aenter__.return_value = mock_session
 
     # Patch the ClientSession in the correct module
-    with patch('backend.services.image_service.aiohttp.ClientSession') as mock_session_class:
+    with patch('services.image_service.aiohttp.ClientSession') as mock_session_class:
         mock_session_class.return_value = mock_client_session
 
         # Test with TestClient
@@ -95,7 +98,7 @@ async def test_proxy_image_remote_error(monkeypatch):
     }
 
     # Patch the ClientSession in the correct module
-    with patch('backend.services.image_service.aiohttp.ClientSession') as mock_session_class:
+    with patch('services.image_service.aiohttp.ClientSession') as mock_session_class:
         mock_session_class.return_value = mock_client_session
 
         # Test with TestClient
@@ -121,7 +124,7 @@ async def test_proxy_image_exception(monkeypatch):
     mock_client_session.__aenter__.return_value = mock_session
 
     # Patch the ClientSession in the correct module
-    with patch('backend.services.image_service.aiohttp.ClientSession') as mock_session_class:
+    with patch('services.image_service.aiohttp.ClientSession') as mock_session_class:
         mock_session_class.return_value = mock_client_session
 
         # Test with TestClient
@@ -155,7 +158,7 @@ async def test_proxy_image_with_special_chars(monkeypatch):
     mock_client_session.__aenter__.return_value = mock_session
 
     # Patch the ClientSession in the correct module
-    with patch('backend.services.image_service.aiohttp.ClientSession') as mock_session_class:
+    with patch('services.image_service.aiohttp.ClientSession') as mock_session_class:
         mock_session_class.return_value = mock_client_session
 
         # Test with TestClient
@@ -185,7 +188,7 @@ async def test_proxy_image_logging(monkeypatch):
     mock_client_session.__aenter__.return_value = mock_session
 
     # Patch the ClientSession in the correct module
-    with patch('backend.services.image_service.aiohttp.ClientSession') as mock_session_class:
+    with patch('services.image_service.aiohttp.ClientSession') as mock_session_class:
         mock_session_class.return_value = mock_client_session
 
         # Test with TestClient

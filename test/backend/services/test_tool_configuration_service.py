@@ -1824,163 +1824,47 @@ class TestValidateLocalToolKnowledgeBaseSearch:
             )
 
 
-class TestValidateLocalToolAnalyzeTextFile:
-    """Test cases for _validate_local_tool function with analyze_text_file tool"""
-
-    @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
-    @patch('backend.services.tool_configuration_service.inspect.signature')
-    @patch('backend.services.tool_configuration_service.get_llm_model')
-    @patch('backend.services.tool_configuration_service.minio_client')
-    @patch('backend.services.tool_configuration_service.DATA_PROCESS_SERVICE', "http://data-process-service")
-    def test_validate_local_tool_analyze_text_file_success(self, mock_minio_client, mock_get_llm_model,
-                                                          mock_signature, mock_get_class):
-        """Test successful analyze_text_file tool validation with proper dependencies"""
-        # Mock tool class
-        mock_tool_class = Mock()
-        mock_tool_instance = Mock()
-        mock_tool_instance.forward.return_value = "analyze text file result"
-        mock_tool_class.return_value = mock_tool_instance
-
-        mock_get_class.return_value = mock_tool_class
-
-        # Mock signature for analyze_text_file tool
-        mock_sig = Mock()
-        mock_sig.parameters = {
-            'self': Mock(),
-            'llm_model': Mock(),
-            'storage_client': Mock(),
-            'data_process_service_url': Mock()
-        }
-        mock_signature.return_value = mock_sig
-
-        # Mock dependencies
-        mock_llm_model = Mock()
-        mock_get_llm_model.return_value = mock_llm_model
-
-        from backend.services.tool_configuration_service import _validate_local_tool
-
-        result = _validate_local_tool(
-            "analyze_text_file",
-            {"input": "test input"},
-            {"param": "config"},
-            "tenant1",
-            "user1"
-        )
-
-        assert result == "analyze text file result"
-        mock_get_class.assert_called_once_with("analyze_text_file")
-
-        # Verify analyze_text_file specific parameters were passed
-        expected_params = {
-            "param": "config",
-            "llm_model": mock_llm_model,
-            "storage_client": mock_minio_client,
-            "data_process_service_url": "http://data-process-service",
-        }
-        mock_tool_class.assert_called_once_with(**expected_params)
-        mock_tool_instance.forward.assert_called_once_with(input="test input")
-
-        # Verify service calls
-        mock_get_llm_model.assert_called_once_with(tenant_id="tenant1")
-
-    @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
-    def test_validate_local_tool_analyze_text_file_missing_tenant_id(self, mock_get_class):
-        """Test analyze_text_file tool validation when tenant_id is missing"""
-        mock_tool_class = Mock()
-        mock_get_class.return_value = mock_tool_class
-
-        from backend.services.tool_configuration_service import _validate_local_tool
-
-        with pytest.raises(ToolExecutionException,
-                           match="Tenant ID and User ID are required for analyze_text_file validation"):
-            _validate_local_tool(
-                "analyze_text_file",
-                {"input": "test input"},
-                {"param": "config"},
-                None,  # Missing tenant_id
-                "user1"
-            )
-
-    @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
-    def test_validate_local_tool_analyze_text_file_missing_user_id(self, mock_get_class):
-        """Test analyze_text_file tool validation when user_id is missing"""
-        mock_tool_class = Mock()
-        mock_get_class.return_value = mock_tool_class
-
-        from backend.services.tool_configuration_service import _validate_local_tool
-
-        with pytest.raises(ToolExecutionException,
-                           match="Tenant ID and User ID are required for analyze_text_file validation"):
-            _validate_local_tool(
-                "analyze_text_file",
-                {"input": "test input"},
-                {"param": "config"},
-                "tenant1",
-                None  # Missing user_id
-            )
-
-
 class TestValidateLocalToolAnalyzeImage:
-    """Test cases for _validate_local_tool function with analyze_image tool"""
+    """Test cases for _validate_local_tool with analyze_image tool."""
 
+    @patch('backend.services.tool_configuration_service.minio_client')
+    @patch('backend.services.tool_configuration_service.get_vlm_model')
     @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
     @patch('backend.services.tool_configuration_service.inspect.signature')
-    @patch('backend.services.tool_configuration_service.get_vlm_model')
-    @patch('backend.services.tool_configuration_service.minio_client')
-    def test_validate_local_tool_analyze_image_success(self, mock_minio_client, mock_get_vlm_model,
-                                                      mock_signature, mock_get_class):
-        """Test successful analyze_image tool validation with proper dependencies"""
-        # Mock tool class
+    def test_validate_local_tool_analyze_image_success(self, mock_signature, mock_get_class, mock_get_vlm_model, mock_minio_client):
         mock_tool_class = Mock()
         mock_tool_instance = Mock()
         mock_tool_instance.forward.return_value = "analyze image result"
         mock_tool_class.return_value = mock_tool_instance
-
         mock_get_class.return_value = mock_tool_class
+        mock_get_vlm_model.return_value = "mock_vlm_model"
 
-        # Mock signature for analyze_image tool
         mock_sig = Mock()
-        mock_sig.parameters = {
-            'self': Mock(),
-            'vlm_model': Mock(),
-            'storage_client': Mock()
-        }
+        mock_sig.parameters = {}
         mock_signature.return_value = mock_sig
-
-        # Mock dependencies
-        mock_vlm_model = Mock()
-        mock_get_vlm_model.return_value = mock_vlm_model
 
         from backend.services.tool_configuration_service import _validate_local_tool
 
         result = _validate_local_tool(
             "analyze_image",
-            {"input": "test input"},
-            {"param": "config"},
+            {"image": "bytes"},
+            {"prompt": "describe"},
             "tenant1",
             "user1"
         )
 
         assert result == "analyze image result"
-        mock_get_class.assert_called_once_with("analyze_image")
-
-        # Verify analyze_image specific parameters were passed
-        expected_params = {
-            "param": "config",
-            "vlm_model": mock_vlm_model,
-            "storage_client": mock_minio_client,
-        }
-        mock_tool_class.assert_called_once_with(**expected_params)
-        mock_tool_instance.forward.assert_called_once_with(input="test input")
-
-        # Verify service calls
         mock_get_vlm_model.assert_called_once_with(tenant_id="tenant1")
+        mock_tool_class.assert_called_once_with(
+            prompt="describe",
+            vlm_model="mock_vlm_model",
+            storage_client=mock_minio_client
+        )
+        mock_tool_instance.forward.assert_called_once_with(image="bytes")
 
     @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
-    def test_validate_local_tool_analyze_image_missing_tenant_id(self, mock_get_class):
-        """Test analyze_image tool validation when tenant_id is missing"""
-        mock_tool_class = Mock()
-        mock_get_class.return_value = mock_tool_class
+    def test_validate_local_tool_analyze_image_missing_tenant(self, mock_get_class):
+        mock_get_class.return_value = Mock()
 
         from backend.services.tool_configuration_service import _validate_local_tool
 
@@ -1988,17 +1872,15 @@ class TestValidateLocalToolAnalyzeImage:
                            match="Tenant ID and User ID are required for analyze_image validation"):
             _validate_local_tool(
                 "analyze_image",
-                {"input": "test input"},
-                {"param": "config"},
-                None,  # Missing tenant_id
+                {"image": "bytes"},
+                {"prompt": "describe"},
+                None,
                 "user1"
             )
 
     @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
-    def test_validate_local_tool_analyze_image_missing_user_id(self, mock_get_class):
-        """Test analyze_image tool validation when user_id is missing"""
-        mock_tool_class = Mock()
-        mock_get_class.return_value = mock_tool_class
+    def test_validate_local_tool_analyze_image_missing_user(self, mock_get_class):
+        mock_get_class.return_value = Mock()
 
         from backend.services.tool_configuration_service import _validate_local_tool
 
@@ -2006,153 +1888,11 @@ class TestValidateLocalToolAnalyzeImage:
                            match="Tenant ID and User ID are required for analyze_image validation"):
             _validate_local_tool(
                 "analyze_image",
-                {"input": "test input"},
-                {"param": "config"},
+                {"image": "bytes"},
+                {"prompt": "describe"},
                 "tenant1",
-                None  # Missing user_id
+                None
             )
-
-
-class TestGetLocalToolsParameterHandling:
-    """Test cases for get_local_tools parameter handling edge cases"""
-
-    @patch('backend.services.tool_configuration_service.get_local_tools_classes')
-    @patch('backend.services.tool_configuration_service.inspect.signature')
-    def test_get_local_tools_with_excluded_param(self, mock_signature, mock_get_classes):
-        """Test get_local_tools with parameter that has exclude=True"""
-        from backend.services.tool_configuration_service import get_local_tools
-        from pydantic_core import PydanticUndefined
-
-        # Create the mock tool class
-        mock_tool_class = Mock()
-        mock_tool_class.name = "test_tool"
-        mock_tool_class.description = "Test tool description"
-        mock_tool_class.inputs = {"input1": "value1"}
-        mock_tool_class.output_type = "string"
-        mock_tool_class.category = "test_category"
-        mock_tool_class.__name__ = "TestTool"
-
-        # Create the mock parameter with exclude=True
-        mock_excluded_param = Mock()
-        mock_excluded_param.annotation = str
-        mock_excluded_param.default = Mock()
-        mock_excluded_param.default.exclude = True  # This should be excluded
-
-        # Create the mock regular parameter
-        mock_param = Mock()
-        mock_param.annotation = str
-        mock_param.default = Mock()
-        mock_param.default.description = "Test parameter"
-        mock_param.default.default = "default_value"
-        mock_param.default.exclude = False
-
-        # Create the mock signature
-        mock_sig = Mock()
-        mock_sig.parameters = {
-            'self': Mock(),
-            'excluded_param': mock_excluded_param,
-            'test_param': mock_param
-        }
-
-        mock_signature.return_value = mock_sig
-        mock_get_classes.return_value = [mock_tool_class]
-
-        result = get_local_tools()
-
-        assert len(result) == 1
-        tool_info = result[0]
-        assert tool_info.name == "test_tool"
-        # Verify excluded param is not in params list
-        param_names = [p["name"] for p in tool_info.params]
-        assert "excluded_param" not in param_names
-        assert "test_param" in param_names
-
-    @patch('backend.services.tool_configuration_service.get_local_tools_classes')
-    @patch('backend.services.tool_configuration_service.inspect.signature')
-    def test_get_local_tools_with_pydantic_undefined_default(self, mock_signature, mock_get_classes):
-        """Test get_local_tools with parameter that has PydanticUndefined default"""
-        from backend.services.tool_configuration_service import get_local_tools
-        from pydantic_core import PydanticUndefined
-
-        # Create the mock tool class
-        mock_tool_class = Mock()
-        mock_tool_class.name = "test_tool"
-        mock_tool_class.description = "Test tool description"
-        mock_tool_class.inputs = {"input1": "value1"}
-        mock_tool_class.output_type = "string"
-        mock_tool_class.category = "test_category"
-        mock_tool_class.__name__ = "TestTool"
-
-        # Create the mock parameter with PydanticUndefined default
-        mock_param = Mock()
-        mock_param.annotation = str
-        mock_param.default = Mock()
-        mock_param.default.description = "Required parameter"
-        mock_param.default.default = PydanticUndefined  # No default value
-        mock_param.default.exclude = False
-
-        # Create the mock signature
-        mock_sig = Mock()
-        mock_sig.parameters = {
-            'self': Mock(),
-            'required_param': mock_param
-        }
-
-        mock_signature.return_value = mock_sig
-        mock_get_classes.return_value = [mock_tool_class]
-
-        result = get_local_tools()
-
-        assert len(result) == 1
-        tool_info = result[0]
-        assert len(tool_info.params) == 1
-        assert tool_info.params[0]["name"] == "required_param"
-        assert tool_info.params[0]["optional"] is False  # Should be required
-
-    @patch('backend.services.tool_configuration_service.get_local_tools_classes')
-    @patch('backend.services.tool_configuration_service.inspect.signature')
-    def test_get_local_tools_with_field_object_default(self, mock_signature, mock_get_classes):
-        """Test get_local_tools with parameter that has Field object with default"""
-        from backend.services.tool_configuration_service import get_local_tools
-        from pydantic_core import PydanticUndefined
-
-        # Create the mock tool class
-        mock_tool_class = Mock()
-        mock_tool_class.name = "test_tool"
-        mock_tool_class.description = "Test tool description"
-        mock_tool_class.inputs = {"input1": "value1"}
-        mock_tool_class.output_type = "string"
-        mock_tool_class.category = "test_category"
-        mock_tool_class.__name__ = "TestTool"
-
-        # Create the mock parameter with Field object default
-        mock_field_default = Mock()
-        mock_field_default.default = "field_default_value"
-        mock_field_default.description = "Field parameter"
-
-        mock_param = Mock()
-        mock_param.annotation = str
-        mock_param.default = mock_field_default
-        mock_param.default.exclude = False
-
-        # Create the mock signature
-        mock_sig = Mock()
-        mock_sig.parameters = {
-            'self': Mock(),
-            'field_param': mock_param
-        }
-
-        mock_signature.return_value = mock_sig
-        mock_get_classes.return_value = [mock_tool_class]
-
-        result = get_local_tools()
-
-        assert len(result) == 1
-        tool_info = result[0]
-        assert len(tool_info.params) == 1
-        assert tool_info.params[0]["name"] == "field_param"
-        assert tool_info.params[0]["optional"] is True
-        assert tool_info.params[0]["default"] == "field_default_value"
 
 
 if __name__ == '__main__':

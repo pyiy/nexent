@@ -8,7 +8,7 @@ Supports images from S3, HTTP, and HTTPS URLs.
 import json
 import logging
 from io import BytesIO
-from typing import List, Union
+from typing import List
 
 from jinja2 import Template, StrictUndefined
 from pydantic import Field
@@ -37,17 +37,16 @@ class AnalyzeImageTool(Tool):
     inputs = {
         "image_urls_list": {
             "type": "array",
-            "description": "List of image URLs (S3, HTTP, or HTTPS). Supports s3://bucket/key, /bucket/key, http://, and https:// URLs. "
-                           "Can also accept a single image URL which will be treated as a list with one element.",
+            "description": "List of image URLs (S3, HTTP, or HTTPS). Supports s3://bucket/key, /bucket/key, http://, and https:// URLs.",
         },
         "query": {
             "type": "string",
             "description": "User's question to guide the analysis"
         }
     }
-    output_type = "string"
-    category = ToolCategory.FILE.value
-    tool_sign = ToolSign.FILE_OPERATION.value
+    output_type = "array"
+    category = ToolCategory.MULTIMODAL.value
+    tool_sign = ToolSign.MULTIMODAL_OPERATION.value
 
     def __init__(
             self,
@@ -77,21 +76,21 @@ class AnalyzeImageTool(Tool):
         self.running_prompt_zh = "正在分析图片..."
         self.running_prompt_en = "Analyzing image..."
 
-    def _forward_impl(self, image_urls_list: Union[bytes, List[bytes]], query: str) -> Union[str, List[str]]:
+    def _forward_impl(self, image_urls_list: List[bytes], query: str) -> List[str]:
         """
-        Analyze images of S3 URL, HTTP URL, or HTTPS URL and return the identified text.
+        Analyze images identified by S3 URL, HTTP URL, or HTTPS URL and return the identified text.
         
         Note: This method is wrapped by load_object decorator which downloads
         the image from S3 URL, HTTP URL, or HTTPS URL and passes bytes to this method.
 
         Args:
-            image_urls_list: image bytes or a sequence of image bytes (converted from URLs by the decorator).
+            image_urls_list: List of image bytes converted from URLs by the decorator.
                              The load_object decorator converts URLs to bytes before calling this method.
             query: User's question to guide the analysis
 
         Returns:
-            Union[str, List[str]]: Single analysis string for one image or a list
-            of analysis strings that align with the order of the provided images.
+            List[str]: One analysis string per image that aligns with the order
+            of the provided images.
 
         Raises:
             Exception: If the image cannot be downloaded or analyzed.
@@ -106,14 +105,10 @@ class AnalyzeImageTool(Tool):
         if image_urls_list is None:
             raise ValueError("image_urls cannot be None")
 
-        if isinstance(image_urls_list, (list, tuple)):
-            image_urls_list: List[bytes] = list(image_urls_list)
-        elif isinstance(image_urls_list, bytes):
-            image_urls_list = [image_urls_list]
-        else:
-            raise ValueError("image_urls must be bytes or a list/tuple of bytes")
+        if not isinstance(image_urls_list, list):
+            raise ValueError("image_urls must be a list of bytes")
 
-        if len(image_urls_list) == 0:
+        if not image_urls_list:
             raise ValueError("image_urls must contain at least one image")
 
         # Load prompts from yaml file
@@ -136,8 +131,6 @@ class AnalyzeImageTool(Tool):
 
                 analysis_results.append(response.content)
 
-            if len(analysis_results) == 1:
-                return analysis_results[0]
             return analysis_results
         except Exception as e:
             logger.error(f"Error analyzing image: {str(e)}", exc_info=True)
