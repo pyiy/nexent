@@ -30,7 +30,7 @@ Nexent的智能记忆系统为智能体提供持久化的上下文感知能力�
 | Agent 记忆共享策略 | 总是共享/每次询问我/禁止共享 | 总是共享 | 定义Agent间共享记忆生成是否需要用户授权同意 |
 
 <div style="display: flex; justify-content: left;">
-  <img src="./assets/memory/mem-config.png" style="width: 80%; height: auto;" alt="记忆系统配置" />
+  <img src="./assets/memory-management/mem-config.png" style="width: 80%; height: auto;" alt="记忆系统配置" />
 </div>
 
 ### 配置说明
@@ -116,7 +116,7 @@ Nexent采用四层记忆存储架构，不同层级的记忆有不同的作用�
 4. 点击对钩确认添加
 
 <div style="display: flex; justify-content: left;">
-  <img src="./assets/memory/add-mem.png" style="width: 80%; height: auto;" alt="添加记忆" />
+  <img src="./assets/memory-management/add-mem.png" style="width: 80%; height: auto;" alt="添加记忆" />
 </div>
 
 ### 删除记忆
@@ -127,7 +127,7 @@ Nexent采用四层记忆存储架构，不同层级的记忆有不同的作用�
 - **删除单条记忆**：点击红色橡皮按钮，可删除特定的一条记忆条目
 
 <div style="display: flex; justify-content: left;">
-  <img src="./assets/memory/delete-mem.png" style="width: 80%; height: auto;" alt="删除记忆" />
+  <img src="./assets/memory-management/delete-mem.png" style="width: 80%; height: auto;" alt="删除记忆" />
 </div>
 
 ## 💡 使用建议

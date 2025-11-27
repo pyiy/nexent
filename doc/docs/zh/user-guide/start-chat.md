@@ -19,7 +19,7 @@
    - 切换后即可开始新的对话
 
 <div style="display: flex; justify-content: center;">
-  <img src="./assets/chat/agent-selection.png" style="width: 80%; height: auto;" alt="选择智能体" />
+  <img src="./assets/start-chat/agent-selection.png" style="width: 80%; height: auto;" alt="选择智能体" />
 </div>
 
 ### 发送文本消息
@@ -40,7 +40,7 @@
    - 思考过程会以卡片形式展示，便于区分
 
 <div style="display: flex; justify-content: center;">
-  <img src="./assets/chat/dialog-box.png" style="width: 80%; height: auto;" alt="选择智能体" />
+  <img src="./assets/start-chat/dialog-box.png" style="width: 80%; height: auto;" alt="选择智能体" />
 </div>
 
 ### 使用语音输入
@@ -121,8 +121,8 @@ Nexent支持语音输入功能，让您可以通过语音与智能体交互。�
 > 💡 **小贴士**：定期清理不需要的对话记录可以保持界面整洁，提高查找效率。
 
 <div style="display: flex; justify-content: space-between;">
-  <img src="./assets/chat/chat-management-1.png" style="width: 48%; height: auto;" alt="对话编辑" />
-  <img src="./assets/chat/chat-management-2.png" style="width: 48%; height: auto;" alt="对话编辑" />
+  <img src="./assets/start-chat/chat-management-1.png" style="width: 48%; height: auto;" alt="对话编辑" />
+  <img src="./assets/start-chat/chat-management-2.png" style="width: 48%; height: auto;" alt="对话编辑" />
 </div>
 
 ### 访问其他功能
@@ -159,8 +159,8 @@ Nexent支持语音输入功能，让您可以通过语音与智能体交互。�
 - 帮助您更直观地了解相关信息
 
 <div style="display: flex; justify-content: space-between;">
-  <img src="./assets/chat/reference-source.png" style="width: 48%; height: auto;" alt="知识引用来源" />
-  <img src="./assets/chat/reference-image.png" style="width: 48%; height: auto;" alt="知识引用图片" />
+  <img src="./assets/start-chat/reference-source.png" style="width: 48%; height: auto;" alt="知识引用来源" />
+  <img src="./assets/start-chat/reference-image.png" style="width: 48%; height: auto;" alt="知识引用图片" />
 </div>
 
 ## 🎭 多模态交互体验
