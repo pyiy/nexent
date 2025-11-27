@@ -4,8 +4,9 @@
 
 ## 🔧 创建知识库
 
-1. 点击“创建知识库”按钮
-2. 为知识库设置一个易于识别的名称，注意知识库名称不能重复
+1. 点击"创建知识库"按钮
+2. 为知识库设置一个易于识别的名称
+   > **注意**：知识库名称不能重复，只能使用中文或者小写字母，且不能包含空格、斜线等特殊字符
 
 ## 📁 上传文件
 
@@ -16,7 +17,7 @@
 3. 系统会自动处理上传的文件，提取文本内容并进行向量化
 4. 可在列表中查看文件的处理状态（解析中/入库中/已就绪）
 
-![文件上传](./assets/knowledge/create-knowledge-base.png)
+![文件上传](./assets/knowledge-base/create-knowledge-base.png)
 
 ### 支持的文件格式
 
@@ -31,14 +32,14 @@ Nexent支持多种文件格式，包括：
 
 ## 📊 知识库总结
 
-建议您为每个知识库配置准确且完整的总结描述，这有助于后续智能体在进行知识库检索时，准确选择合适的知识库进行检索。
+建议您为每个知识库配置准确且完整的总结描述，这有助于后续智能体在进行检索时，准确选择合适的知识库。
 
 1. 点击“详细内容”按钮进入知识库详细内容查看界面
 2. 选择合适的模型，点击“自动总结”按钮为知识库自动生成内容总结
 3. 您可对生成的内容总结进行编辑修改，使其更准确
 4. 最后记得点击“保存”将您的修改保存
 
-![内容总结](./assets/knowledge/summary-knowledge-base.png)
+![内容总结](./assets/knowledge-base/summary-knowledge-base.png)
 
 ## 🔍 知识库管理
 
@@ -53,8 +54,8 @@ Nexent支持多种文件格式，包括：
    - 点击“详细内容”，可查看知识库的内容总结
 
 <div style="display: flex; gap: 8px;">
-  <img src="./assets/knowledge/knowledge-base-file-list.png" style="width: 50%; height: 100%;" />
-  <img src="./assets/knowledge/knowledge-base-summary.png" style="width: 50%; height: 100%;" />
+  <img src="./assets/knowledge-base/knowledge-base-file-list.png" style="width: 50%; height: 100%;" />
+  <img src="./assets/knowledge-base/knowledge-base-summary.png" style="width: 50%; height: 100%;" />
 </div>
 
 ### 编辑知识库
@@ -62,9 +63,9 @@ Nexent支持多种文件格式，包括：
 1. **删除知识库**
    - 点击知识库名称右侧“删除”按钮
    - 确认删除操作（此操作不可恢复）
-![删除知识库](./assets/knowledge/delete-knowledge-base.png)
+![删除知识库](./assets/knowledge-base/delete-knowledge-base.png)
 
-2. **删除/新增文件**
+2. **删除或新增文件**
    - 点击知识库名称，在文件列表中点击“删除”按钮，可从知识库中删除文件
    - 点击知识库名称，在文件列表下方文件上传区域，可新增文件到知识库中
 

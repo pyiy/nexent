@@ -64,6 +64,10 @@ just dropping by to say nice work 👍 starred the repo
 Really impressed by Nexent — smooth interface and powerful agent framework. Great work!
 :::
 
+::: info gsong - 2025-11-26
+Nexent represents the future of intelligent agent creation — simple, elegant, and incredibly powerful. As a true zero-code platform, it eliminates the need for orchestration or complex drag-and-drop workflows, allowing anyone to build agents using pure natural language. Built on the robust MCP ecosystem with rich tool integrations, Nexent goes far beyond basic automation by offering a suite of built-in agents tailored for real-world scenarios — from work and travel to everyday life. Its capabilities for agent execution control, multi-agent collaboration, data processing and knowledge tracing, multimodal dialogue, and batch scaling set a new benchmark in intelligent service platforms. Nexent doesn’t just accelerate development — it redefines what’s possible.
+:::
+
 ::: info uu - 2024-01-15
 华为ICT智能体，感谢nexent平台支持！
 :::

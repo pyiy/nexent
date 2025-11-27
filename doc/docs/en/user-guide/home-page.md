@@ -10,6 +10,8 @@ By the end, you’ll know how to turn your ideas into production-ready agents th
 
 The Nexent homepage highlights the core entry points of the platform:
 
+![Homepage Overview](./assets/home-page/homepage.png)
+
 ### Primary actions
 
 1. **Start Chatting** – Jump straight into the chat interface and talk to an agent.
@@ -20,7 +22,7 @@ The Nexent homepage highlights the core entry points of the platform:
 
 The left sidebar exposes every major module:
 
-- **Home** – Return to the homepage.
+- **Home Page** – Return to the homepage.
 - **Start Chat** – Open the chat interface.
 - **Quick Setup** – Complete the recommended setup flow (Models → Knowledge Base → Agent).
 - **Agent Space** – Manage all existing agents.
@@ -39,10 +41,10 @@ We recommend configuring the platform in this order:
 
 1. Set up **[Model Management](./model-management)** to define app details and connect AI models.
 2. Create your **[Knowledge Base](./knowledge-base)** and upload documents.
-3. Build your **[Agents](./agent-development)** on top of the models and knowledge base.
-4. When everything is ready, chat with your agents via **[Start Chatting](./start-chat)**.
+3. Conduct **[Agent Development](./agent-development)** on top of the models and knowledge base.
+4. When everything is ready, chat with your agents via **[Start Chat](./start-chat)**.
 
-Prefer a guided flow? Click the “Quick Setup” button on the homepage and follow the prompts.
+Alternatively, you can click the "Quick Setup" button on the homepage or in the navigation bar and follow the guided flow to complete the setup.
 
 ## 💡 Get Help
 

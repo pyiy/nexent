@@ -6,6 +6,7 @@ Create and manage knowledge bases, upload documents, and generate summaries. Kno
 
 1. Click **Create Knowledge Base**
 2. Enter a descriptive, unique name
+   > **Note:** Knowledge base names must be unique and can only contain Chinese characters or lowercase letters. Spaces, slashes, and other special characters are not allowed.
 
 ## 📁 Upload Files
 
@@ -16,7 +17,7 @@ Create and manage knowledge bases, upload documents, and generate summaries. Kno
 3. Nexent automatically parses files, extracts text, and vectorizes the content
 4. Track the processing status in the list (Parsing/Ingesting/Ready)
 
-![File Upload](./assets/knowledge/create-knowledge-base.png)
+![File Upload](./assets/knowledge-base/create-knowledge-base.png)
 
 ### Supported File Formats
 
@@ -37,7 +38,7 @@ Give every knowledge base a clear summary so agents can pick the right source du
 3. Edit the generated text to improve accuracy
 4. Click **Save** to store your changes
 
-![Content Summary](./assets/knowledge/summary-knowledge-base.png)
+![Content Summary](./assets/knowledge-base/summary-knowledge-base.png)
 
 ## 🔍 Knowledge Base Management
 
@@ -51,8 +52,8 @@ Give every knowledge base a clear summary so agents can pick the right source du
    - Click **Details** to view or edit the summary
 
 <div style="display: flex; gap: 8px;">
-  <img src="./assets/knowledge/knowledge-base-file-list.png" style="width: 50%; height: 100%;" />
-  <img src="./assets/knowledge/knowledge-base-summary.png" style="width: 50%; height: 100%;" />
+  <img src="./assets/knowledge-base/knowledge-base-file-list.png" style="width: 50%; height: 100%;" />
+  <img src="./assets/knowledge-base/knowledge-base-summary.png" style="width: 50%; height: 100%;" />
 </div>
 
 ### Edit Knowledge Bases
@@ -61,9 +62,9 @@ Give every knowledge base a clear summary so agents can pick the right source du
    - Click **Delete** to the right of the knowledge base row
    - Confirm the deletion (irreversible)
 
-![Delete Knowledge Base](./assets/knowledge/delete-knowledge-base.png)
+![Delete Knowledge Base](./assets/knowledge-base/delete-knowledge-base.png)
 
-2. **Delete/Add Files**
+2. **Delete or Add Files**
    - Inside the file list, click **Delete** to remove a document
    - Use the upload area under the list to add new files
 

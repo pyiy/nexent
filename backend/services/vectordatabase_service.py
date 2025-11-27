@@ -13,6 +13,7 @@ import asyncio
 import logging
 import os
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Generator, List, Optional
 
@@ -24,6 +25,7 @@ from nexent.vector_database.base import VectorDatabaseCore
 from nexent.vector_database.elasticsearch_core import ElasticSearchCore
 
 from consts.const import ES_API_KEY, ES_HOST, LANGUAGE, VectorDatabaseType
+from consts.model import ChunkCreateRequest, ChunkUpdateRequest
 from database.attachment_db import delete_file
 from database.knowledge_db import (
     create_knowledge_record,
@@ -35,8 +37,17 @@ from services.redis_service import get_redis_service
 from utils.config_utils import tenant_config_manager, get_model_name_from_config
 from utils.file_management_utils import get_all_files_status, get_file_size
 
-ALLOWED_CHUNK_FIELDS = {"filename",
-                        "path_or_url", "content", "create_time", "id"}
+ALLOWED_CHUNK_FIELDS = {
+    "id",
+    "title",
+    "filename",
+    "path_or_url",
+    "content",
+    "create_time",
+    "language",
+    "author",
+    "date",
+}
 
 # Configure logging
 logger = logging.getLogger("vectordatabase_service")
@@ -996,3 +1007,193 @@ class ElasticSearchService:
             error_msg = f"Error retrieving chunks from index {index_name}: {str(e)}"
             logger.error(error_msg)
             raise Exception(error_msg)
+
+    @staticmethod
+    def create_chunk(
+        index_name: str,
+        chunk_request: ChunkCreateRequest,
+        vdb_core: VectorDatabaseCore = Depends(get_vector_db_core),
+        user_id: Optional[str] = None,
+    ):
+        """
+        Create a manual chunk entry in the specified index.
+        """
+        try:
+            chunk_payload = ElasticSearchService._build_chunk_payload(
+                base_fields={
+                    "id": chunk_request.chunk_id or ElasticSearchService._generate_chunk_id(),
+                    "title": chunk_request.title,
+                    "filename": chunk_request.filename,
+                    "path_or_url": chunk_request.path_or_url,
+                    "content": chunk_request.content,
+                    "created_by": user_id,
+                },
+                metadata=chunk_request.metadata,
+                ensure_create_time=True,
+            )
+            result = vdb_core.create_chunk(index_name, chunk_payload)
+            return {
+                "status": "success",
+                "message": f"Chunk {result.get('id')} created successfully",
+                "chunk_id": result.get("id"),
+            }
+        except Exception as exc:
+            logger.error("Error creating chunk in index %s: %s",
+                         index_name, exc, exc_info=True)
+            raise Exception(f"Error creating chunk: {exc}")
+
+    @staticmethod
+    def update_chunk(
+        index_name: str,
+        chunk_id: str,
+        chunk_request: ChunkUpdateRequest,
+        vdb_core: VectorDatabaseCore = Depends(get_vector_db_core),
+        user_id: Optional[str] = None,
+    ):
+        """
+        Update a chunk document.
+        """
+        try:
+            update_fields = chunk_request.dict(
+                exclude_unset=True, exclude={"metadata"})
+            metadata = chunk_request.metadata or {}
+            update_payload = ElasticSearchService._build_chunk_payload(
+                base_fields={
+                    **update_fields,
+                    "updated_by": user_id,
+                    "update_time": datetime.utcnow().strftime(
+                        "%Y-%m-%dT%H:%M:%S"),
+                },
+                metadata=metadata,
+                ensure_create_time=False,
+            )
+
+            if not update_payload:
+                raise ValueError("No update fields supplied.")
+
+            result = vdb_core.update_chunk(
+                index_name, chunk_id, update_payload)
+            return {
+                "status": "success",
+                "message": f"Chunk {result.get('id')} updated successfully",
+                "chunk_id": result.get("id"),
+            }
+        except Exception as exc:
+            logger.error("Error updating chunk %s in index %s: %s",
+                         chunk_id, index_name, exc, exc_info=True)
+            raise Exception(f"Error updating chunk: {exc}")
+
+    @staticmethod
+    def delete_chunk(
+        index_name: str,
+        chunk_id: str,
+        vdb_core: VectorDatabaseCore = Depends(get_vector_db_core),
+    ):
+        """
+        Delete a chunk document by id.
+        """
+        try:
+            deleted = vdb_core.delete_chunk(index_name, chunk_id)
+            if not deleted:
+                raise ValueError(
+                    f"Chunk {chunk_id} not found in index {index_name}")
+            return {
+                "status": "success",
+                "message": f"Chunk {chunk_id} deleted successfully",
+                "chunk_id": chunk_id,
+            }
+        except Exception as exc:
+            logger.error("Error deleting chunk %s in index %s: %s",
+                         chunk_id, index_name, exc, exc_info=True)
+            raise Exception(f"Error deleting chunk: {exc}")
+
+    @staticmethod
+    def search_hybrid(
+            *,
+            index_names: List[str],
+            query: str,
+            tenant_id: str,
+            top_k: int = 10,
+            weight_accurate: float = 0.5,
+            vdb_core: VectorDatabaseCore = Depends(get_vector_db_core),
+    ):
+        """
+        Execute a hybrid search that blends accurate and semantic scoring.
+        """
+        try:
+            if not tenant_id:
+                raise ValueError("Tenant ID is required for hybrid search")
+            if not query or not query.strip():
+                raise ValueError("Query text is required for hybrid search")
+            if not index_names:
+                raise ValueError("At least one index name is required")
+            if top_k <= 0:
+                raise ValueError("top_k must be greater than 0")
+            if weight_accurate < 0 or weight_accurate > 1:
+                raise ValueError("weight_accurate must be between 0 and 1")
+
+            embedding_model = get_embedding_model(tenant_id)
+            if not embedding_model:
+                raise ValueError(
+                    "No embedding model configured for the current tenant")
+
+            start_time = time.perf_counter()
+            raw_results = vdb_core.hybrid_search(
+                index_names=index_names,
+                query_text=query,
+                embedding_model=embedding_model,
+                top_k=top_k,
+                weight_accurate=weight_accurate,
+            )
+            elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+
+            formatted_results = []
+            for item in raw_results:
+                document = dict(item.get("document", {}))
+                document["score"] = item.get("score")
+                document["index"] = item.get("index")
+                if "scores" in item:
+                    document["score_details"] = item["scores"]
+                formatted_results.append(document)
+
+            return {
+                "results": formatted_results,
+                "total": len(formatted_results),
+                "query_time_ms": elapsed_ms,
+            }
+        except ValueError:
+            raise
+        except Exception as exc:
+            logger.error(
+                f"Hybrid search failed for indices {index_names}: {exc}",
+                exc_info=True,
+            )
+            raise Exception(f"Error executing hybrid search: {str(exc)}")
+
+    @staticmethod
+    def _generate_chunk_id() -> str:
+        """Generate a deterministic chunk id."""
+        return f"chunk_{uuid.uuid4().hex}"
+
+    @staticmethod
+    def _build_chunk_payload(
+        base_fields: Dict[str, Any],
+        metadata: Optional[Dict[str, Any]],
+        ensure_create_time: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Merge and sanitize chunk payload fields.
+        """
+        payload = {
+            key: value for key, value in (base_fields or {}).items() if value is not None
+        }
+        if metadata:
+            for key, value in metadata.items():
+                if value is not None:
+                    payload[key] = value
+
+        if ensure_create_time and "create_time" not in payload:
+            payload["create_time"] = datetime.utcnow().strftime(
+                "%Y-%m-%dT%H:%M:%S")
+
+        return payload

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { App, Button, Card, Input, List, Menu, Switch, Tabs } from "antd";
 import { motion } from "framer-motion";
 import "./memory.css";
@@ -261,139 +261,19 @@ export default function MemoryContent({ onNavigate }: MemoryContentProps) {
     );
   };
 
-  // Render memory groups with menu (for agent shared and user agent)
   const renderMemoryWithMenu = (
     groups: { title: string; key: string; items: any[] }[],
-    showSwitch = false,
-    tabKey?: MemoryTabKey
-  ) => {
-    const [selectedKey, setSelectedKey] = useState<string>(
-      groups.length > 0 ? groups[0].key : ""
-    );
-
-    if (groups.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-20">
-          <MessageSquareDashed className="size-16 mb-4 text-gray-300" />
-          <p className="text-base text-gray-500">{t("memoryManageModal.noMemory")}</p>
-        </div>
-      );
-    }
-
-    const currentGroup = groups.find((g) => g.key === selectedKey) || groups[0];
-    const isPlaceholder = /-placeholder$/.test(currentGroup.key);
-    const disabled = !isPlaceholder && !!memory.disabledGroups[currentGroup.key];
-
-    const menuItems = groups.map((g) => {
-      const groupDisabled = !/-placeholder$/.test(g.key) && !!memory.disabledGroups[g.key];
-      return {
-        key: g.key,
-        label: (
-          <div className="flex items-center justify-between w-full">
-            <span className="truncate">{g.title}</span>
-            {showSwitch && !/-placeholder$/.test(g.key) && (
-              <div onClick={(e) => e.stopPropagation()}>
-                <Switch
-                  size="small"
-                  checked={!groupDisabled}
-                  onChange={(val) => memory.toggleGroup(g.key, val)}
-                />
-              </div>
-            )}
-          </div>
-        ),
-        disabled: groupDisabled,
-      };
-    });
-
-    return (
-      <div className="flex gap-4" style={{ height: "calc(100vh - 280px)" }}>
-        {/* Left Menu */}
-        <Menu
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          onClick={({ key }) => setSelectedKey(key)}
-          items={menuItems}
-          style={{ width: 280, height: "100%", overflowY: "auto" }}
-        />
-
-        {/* Right List */}
-        <div className="flex-1">
-          <List
-            header={
-              <div className="flex items-center justify-between">
-                <span className="text-base font-medium">{currentGroup.title}</span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<MessageSquarePlus className="size-4" />}
-                    onClick={() => memory.startAddingMemory(currentGroup.key)}
-                    disabled={disabled}
-                    className="hover:bg-green-50 hover:text-green-600"
-                    title={t("memoryManageModal.addMemory")}
-                  />
-                  {currentGroup.items.length > 0 && (
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<MessageSquareOff className="size-4" />}
-                      onClick={() =>
-                        !isPlaceholder && handleClearConfirm(currentGroup.key, currentGroup.title)
-                      }
-                      disabled={disabled}
-                      danger
-                      className="hover:bg-red-50"
-                      title={t("memoryManageModal.clearMemory")}
-                    />
-                  )}
-                </div>
-              </div>
-            }
-            bordered
-            dataSource={currentGroup.items}
-            locale={{
-              emptyText: (
-                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                  <MessageSquareDashed className="size-12 mb-3 opacity-50" />
-                  <p className="text-sm">{t("memoryManageModal.noMemory")}</p>
-                </div>
-              ),
-            }}
-            style={{ height: "100%", overflowY: "auto" }}
-            renderItem={(item) => (
-              <List.Item
-                className="hover:bg-gray-50 transition-colors"
-                actions={[
-                  <Button
-                    key="delete"
-                    type="text"
-                    size="small"
-                    danger
-                    icon={<Eraser className="size-4" />}
-                    onClick={() => memory.handleDeleteMemory(item.id, currentGroup.key)}
-                    disabled={disabled}
-                    title={t("memoryManageModal.deleteMemory")}
-                  />,
-                ]}
-              >
-                <div className="flex flex-col text-sm">{item.memory}</div>
-              </List.Item>
-            )}
-          >
-            {memory.addingMemoryKey === currentGroup.key && (
-              <List.Item 
-                className="bg-blue-50 border-t-2 border-blue-300 flex items-center" 
-                style={{ minHeight: "100px", padding: "20px" }}
-              >
-                {renderAddMemoryInput(currentGroup.key)}
-              </List.Item>
-            )}
-          </List>
-        </div>
-      </div>
-    );
-  };
+    showSwitch = false
+  ) => (
+    <MemoryMenuList
+      groups={groups}
+      showSwitch={showSwitch}
+      memory={memory}
+      t={t}
+      onClearConfirm={handleClearConfirm}
+      renderAddMemoryInput={renderAddMemoryInput}
+    />
+  );
 
   const tabItems = [
     {
@@ -427,11 +307,7 @@ export default function MemoryContent({ onNavigate }: MemoryContentProps) {
                 {t("memoryManageModal.agentShareTab")}
               </span>
             ),
-            children: renderMemoryWithMenu(
-              memory.agentSharedGroups,
-              true,
-              MEMORY_TAB_KEYS.AGENT_SHARED
-            ),
+            children: renderMemoryWithMenu(memory.agentSharedGroups, true),
             disabled:
               !memory.memoryEnabled ||
               memory.shareOption === MEMORY_SHARE_STRATEGY.NEVER,
@@ -457,11 +333,7 @@ export default function MemoryContent({ onNavigate }: MemoryContentProps) {
           {t("memoryManageModal.userAgentTab")}
         </span>
       ),
-      children: renderMemoryWithMenu(
-        memory.userAgentGroups,
-        true,
-        MEMORY_TAB_KEYS.USER_AGENT
-      ),
+      children: renderMemoryWithMenu(memory.userAgentGroups, true),
       disabled: !memory.memoryEnabled,
     },
   ];
@@ -513,6 +385,155 @@ export default function MemoryContent({ onNavigate }: MemoryContentProps) {
         onCancel={handleClearConfirmCancel}
       />
     </>
+  );
+}
+
+interface MemoryMenuListProps {
+  groups: { title: string; key: string; items: any[] }[];
+  showSwitch?: boolean;
+  memory: ReturnType<typeof useMemory>;
+  t: ReturnType<typeof useTranslation>["t"];
+  onClearConfirm: (groupKey: string, groupTitle: string) => void;
+  renderAddMemoryInput: (groupKey: string) => React.ReactNode;
+}
+
+function MemoryMenuList({
+  groups,
+  showSwitch = false,
+  memory,
+  t,
+  onClearConfirm,
+  renderAddMemoryInput,
+}: MemoryMenuListProps) {
+  const [selectedKey, setSelectedKey] = useState<string>(
+    groups.length > 0 ? groups[0].key : ""
+  );
+
+  useEffect(() => {
+    if (!groups.some((group) => group.key === selectedKey)) {
+      setSelectedKey(groups[0]?.key ?? "");
+    }
+  }, [groups, selectedKey]);
+
+  if (groups.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <MessageSquareDashed className="size-16 mb-4 text-gray-300" />
+        <p className="text-base text-gray-500">{t("memoryManageModal.noMemory")}</p>
+      </div>
+    );
+  }
+
+  const currentGroup = groups.find((g) => g.key === selectedKey) || groups[0];
+  const isPlaceholder = /-placeholder$/.test(currentGroup.key);
+  const disabled = !isPlaceholder && !!memory.disabledGroups[currentGroup.key];
+
+  const menuItems = groups.map((g) => {
+    const groupDisabled = !/-placeholder$/.test(g.key) && !!memory.disabledGroups[g.key];
+    return {
+      key: g.key,
+      label: (
+        <div className="flex items-center justify-between w-full">
+          <span className="truncate">{g.title}</span>
+          {showSwitch && !/-placeholder$/.test(g.key) && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <Switch
+                size="small"
+                checked={!groupDisabled}
+                onChange={(val) => memory.toggleGroup(g.key, val)}
+              />
+            </div>
+          )}
+        </div>
+      ),
+      disabled: groupDisabled,
+    };
+  });
+
+  return (
+    <div className="flex gap-4" style={{ height: "calc(100vh - 280px)" }}>
+      <Menu
+        mode="inline"
+        selectedKeys={[selectedKey]}
+        onClick={({ key }) => setSelectedKey(key)}
+        items={menuItems}
+        style={{ width: 280, height: "100%", overflowY: "auto" }}
+      />
+
+      <div className="flex-1">
+        <List
+          header={
+            <div className="flex items-center justify-between">
+              <span className="text-base font-medium">{currentGroup.title}</span>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<MessageSquarePlus className="size-4" />}
+                  onClick={() => memory.startAddingMemory(currentGroup.key)}
+                  disabled={disabled}
+                  className="hover:bg-green-50 hover:text-green-600"
+                  title={t("memoryManageModal.addMemory")}
+                />
+                {currentGroup.items.length > 0 && (
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<MessageSquareOff className="size-4" />}
+                    onClick={() =>
+                      !isPlaceholder && onClearConfirm(currentGroup.key, currentGroup.title)
+                    }
+                    disabled={disabled}
+                    danger
+                    className="hover:bg-red-50"
+                    title={t("memoryManageModal.clearMemory")}
+                  />
+                )}
+              </div>
+            </div>
+          }
+          bordered
+          dataSource={currentGroup.items}
+          locale={{
+            emptyText: (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                <MessageSquareDashed className="size-12 mb-3 opacity-50" />
+                <p className="text-sm">{t("memoryManageModal.noMemory")}</p>
+              </div>
+            ),
+          }}
+          style={{ height: "100%", overflowY: "auto" }}
+          renderItem={(item) => (
+            <List.Item
+              className="hover:bg-gray-50 transition-colors"
+              actions={[
+                <Button
+                  key="delete"
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<Eraser className="size-4" />}
+                  onClick={() => memory.handleDeleteMemory(item.id, currentGroup.key)}
+                  disabled={disabled}
+                  title={t("memoryManageModal.deleteMemory")}
+                />,
+              ]}
+            >
+              <div className="flex flex-col text-sm">{item.memory}</div>
+            </List.Item>
+          )}
+        >
+          {memory.addingMemoryKey === currentGroup.key && (
+            <List.Item
+              className="bg-blue-50 border-t-2 border-blue-300 flex items-center"
+              style={{ minHeight: "100px", padding: "20px" }}
+            >
+              {renderAddMemoryInput(currentGroup.key)}
+            </List.Item>
+          )}
+        </List>
+      </div>
+    </div>
   );
 }
 

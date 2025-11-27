@@ -218,3 +218,48 @@ export const getConnectivityMeta = (status: ConnectivityStatusType): Connectivit
       }
   }
 }
+
+/**
+ * Format search score as percentage string
+ * @param score Search score (0-1 range)
+ * @returns Formatted percentage string with one decimal place (e.g., "95.5%")
+ */
+export function formatScoreAsPercentage(score: number): string {
+  if (typeof score !== 'number' || isNaN(score)) {
+    return '0.0%';
+  }
+  const percentage = score * 100;
+  return `${percentage.toFixed(1)}%`;
+}
+
+/**
+ * Get color for search score tag
+ * @param score Search score (0-1 range)
+ * @returns Color hex string - default gray for scores < 90%, green gradient for scores >= 90%
+ */
+export function getScoreColor(score: number): string {
+  if (typeof score !== 'number' || isNaN(score)) {
+    return '#d9d9d9'; // Default gray
+  }
+  
+  const percentage = score * 100;
+  
+  // Scores below 90% use default gray
+  if (percentage < 90) {
+    return '#d9d9d9';
+  }
+  
+  // Scores 90% and above: gradient from light green to dark green
+  // Map 90-100% to color range: #A8E6B2 (light green) to #39C651 (dark green)
+  const normalized = (percentage - 90) / 10; // 0 to 1 for 90-100%
+  
+  // Interpolate between light green (#95de64) and dark green (#52c41a)
+  const r1 = 0xa8, g1 = 0xe6, b1 = 0xb2; // Light green
+  const r2 = 0x39, g2 = 0xc6, b2 = 0x51; // Dark green
+  
+  const r = Math.round(r1 + (r2 - r1) * normalized);
+  const g = Math.round(g1 + (g2 - g1) * normalized);
+  const b = Math.round(b1 + (b2 - b1) * normalized);
+  
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
