@@ -1071,13 +1071,13 @@ export default function AgentConfigModal({
                     const tooltipText = getButtonTitle();
                     return (
                       tooltipText ||
-                      t("businessLogic.config.button.saveToAgentPool")
+                      t("common.save")
                     );
                   }
-                  return t("businessLogic.config.button.saveToAgentPool");
+                  return t("common.save");
                 })()}
               >
-                {t("businessLogic.config.button.saveToAgentPool")}
+                {t("common.save")}
               </Button>
             ) : (
               <Button

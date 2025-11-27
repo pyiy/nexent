@@ -423,6 +423,102 @@ const convertLatexDelimiters = (content: string): string => {
   );
 };
 
+// Video component with error handling - defined outside to prevent re-creation on each render
+interface VideoWithErrorHandlingProps {
+  src: string;
+  alt?: string | null;
+  props?: React.VideoHTMLAttributes<HTMLVideoElement>;
+}
+
+const VideoWithErrorHandling: React.FC<VideoWithErrorHandlingProps> = React.memo(({ src, alt, props = {} }) => {
+  const { t } = useTranslation("common");
+  const [hasError, setHasError] = React.useState(false);
+
+  if (hasError) {
+    return (
+      <div className="markdown-media-error">
+        <div className="markdown-media-error-message">
+          {t("chatStreamMessage.videoLinkUnavailable", {
+            defaultValue: "This video link is unavailable",
+          })}
+        </div>
+        {alt && (
+          <div className="markdown-media-error-caption">{alt}</div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <figure className="markdown-video-wrapper">
+      <video
+        className="markdown-video"
+        controls
+        preload="metadata"
+        playsInline
+        src={src}
+        onError={() => setHasError(true)}
+        {...props}
+      >
+        {t("chatStreamMessage.videoNotSupported", {
+          defaultValue: "Sorry, your browser does not support embedded videos.",
+        })}
+      </video>
+      {alt ? (
+        <figcaption className="markdown-video-caption">{alt}</figcaption>
+      ) : null}
+    </figure>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  // Only compare src and alt, props object reference may change but content is the same
+  return prevProps.src === nextProps.src && 
+         prevProps.alt === nextProps.alt;
+});
+
+VideoWithErrorHandling.displayName = "VideoWithErrorHandling";
+
+// Image component with error handling - defined outside to prevent re-creation on each render
+interface ImageWithErrorHandlingProps {
+  src: string;
+  alt?: string | null;
+}
+
+const ImageWithErrorHandling: React.FC<ImageWithErrorHandlingProps> = React.memo(({ src, alt }) => {
+  const { t } = useTranslation("common");
+  const [hasError, setHasError] = React.useState(false);
+
+  if (hasError) {
+    return (
+      <div className="markdown-media-error">
+        <div className="markdown-media-error-message">
+          {t("chatStreamMessage.imageLinkUnavailable", {
+            defaultValue: "This image link is unavailable",
+          })}
+        </div>
+        {alt && (
+          <div className="markdown-media-error-caption">{alt}</div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt ?? undefined}
+      className="markdown-img"
+      onError={() => setHasError(true)}
+    />
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  return prevProps.src === nextProps.src && 
+         prevProps.alt === nextProps.alt;
+});
+
+ImageWithErrorHandling.displayName = "ImageWithErrorHandling";
+
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   className,
@@ -517,47 +613,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       return renderMediaFallback(src, alt);
     }
 
-    const VideoWithErrorHandling = () => {
-      const [hasError, setHasError] = React.useState(false);
-
-      if (hasError) {
-        return (
-          <div className="markdown-media-error">
-            <div className="markdown-media-error-message">
-              {t("chatStreamMessage.videoLinkUnavailable", {
-                defaultValue: "This video link is unavailable",
-              })}
-            </div>
-            {alt && (
-              <div className="markdown-media-error-caption">{alt}</div>
-            )}
-          </div>
-        );
-      }
-
-      return (
-        <figure className="markdown-video-wrapper">
-          <video
-            className="markdown-video"
-            controls
-            preload="metadata"
-            playsInline
-            src={src}
-            onError={() => setHasError(true)}
-            {...props}
-          >
-            {t("chatStreamMessage.videoNotSupported", {
-              defaultValue: "Sorry, your browser does not support embedded videos.",
-            })}
-          </video>
-          {alt ? (
-            <figcaption className="markdown-video-caption">{alt}</figcaption>
-          ) : null}
-        </figure>
-      );
-    };
-
-    return <VideoWithErrorHandling />;
+    return <VideoWithErrorHandling key={src} src={src} alt={alt} props={props} />;
   };
 
   // Modified processText function logic
@@ -861,35 +917,11 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   return renderVideoElement({ src, alt });
                 }
 
-                const ImageWithErrorHandling = () => {
-                  const [hasError, setHasError] = React.useState(false);
+                if (!src || typeof src !== "string") {
+                  return null;
+                }
 
-                  if (hasError) {
-                    return (
-                      <div className="markdown-media-error">
-                        <div className="markdown-media-error-message">
-                          {t("chatStreamMessage.imageLinkUnavailable", {
-                            defaultValue: "This image link is unavailable",
-                          })}
-                        </div>
-                        {alt && (
-                          <div className="markdown-media-error-caption">{alt}</div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <img
-                      src={src}
-                      alt={alt}
-                      className="markdown-img"
-                      onError={() => setHasError(true)}
-                    />
-                  );
-                };
-
-                return <ImageWithErrorHandling />;
+                return <ImageWithErrorHandling key={src} src={src} alt={alt} />;
               },
               // Video
               video: ({ children, ...props }: any) => {
