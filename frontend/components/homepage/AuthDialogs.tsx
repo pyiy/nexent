@@ -79,7 +79,7 @@ export function AuthDialogs({
           <div className="mt-4">
             <p className="text-base font-medium">
               <Trans i18nKey="page.loginPrompt.githubSupport">
-                ⭐️ Nexent is still growing, please help me by starring on{" "}
+                ⭐️ Nexent is still growing, please help me by starring on
                 <a
                   href="https://github.com/ModelEngine-Group/nexent"
                   target="_blank"
@@ -151,7 +151,7 @@ export function AuthDialogs({
           <div className="mt-4">
             <p className="text-base font-medium">
               <Trans i18nKey="page.adminPrompt.githubSupport">
-                ⭐️ Nexent is still growing, please help me by starring on{" "}
+                ⭐️ Nexent is still growing, please help me by starring on 
                 <a
                   href="https://github.com/ModelEngine-Group/nexent"
                   target="_blank"
@@ -165,7 +165,7 @@ export function AuthDialogs({
               <br />
               <br />
               <Trans i18nKey="page.adminPrompt.becomeAdmin">
-                💡 Want to become an administrator? Please visit the{" "}
+                💡 Want to become an administrator? Please visit the 
                 <a
                   href="http://nexent.tech/contact"
                   target="_blank"
@@ -173,7 +173,7 @@ export function AuthDialogs({
                   className="text-blue-600 hover:text-blue-700 font-bold"
                 >
                   official contact page
-                </a>{" "}
+                </a> 
                 to apply for an administrator account.
               </Trans>
             </p>
