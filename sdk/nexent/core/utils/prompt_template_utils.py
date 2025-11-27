@@ -4,19 +4,22 @@ from typing import Dict, Any
 
 import yaml
 
-
-logger = logging.getLogger("prompt_template_utils")
-
 LANGUAGE = {
     "ZH": "zh",
     "EN": "en"
 }
+
+logger = logging.getLogger("prompt_template_utils")
 
 # Define template path mapping
 template_paths = {
     'analyze_image': {
         LANGUAGE["ZH"]: 'core/prompts/analyze_image.yaml',
         LANGUAGE["EN"]: 'core/prompts/analyze_image_en.yaml'
+    },
+    'analyze_file': {
+        LANGUAGE["ZH"]: 'core/prompts/analyze_file.yaml',
+        LANGUAGE["EN"]: 'core/prompts/analyze_file_en.yaml'
     }
 }
 
@@ -27,6 +30,7 @@ def get_prompt_template(template_type: str, language: str = LANGUAGE["ZH"], **kw
     Args:
         template_type: Template type, supports the following values:
             - 'analyze_image': Analyze image template
+            - 'analyze_file': Analyze file template (for text files)
         language: Language code ('zh' or 'en')
         **kwargs: Additional parameters, for agent type need to pass is_manager parameter
 
@@ -47,7 +51,7 @@ def get_prompt_template(template_type: str, language: str = LANGUAGE["ZH"], **kw
     # Go up one level from utils to core, then use the template path
     core_dir = os.path.dirname(current_dir)
     absolute_template_path = os.path.join(core_dir, template_path.replace('core/', ''))
-    
+
     # Read and return template content
     with open(absolute_template_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)

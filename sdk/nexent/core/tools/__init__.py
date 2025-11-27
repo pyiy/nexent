@@ -12,6 +12,7 @@ from .delete_directory_tool import DeleteDirectoryTool
 from .move_item_tool import MoveItemTool
 from .list_directory_tool import ListDirectoryTool
 from .terminal_tool import TerminalTool
+from .analyze_text_file_tool import AnalyzeTextFileTool
 from .analyze_image_tool import AnalyzeImageTool
 
 __all__ = [
@@ -29,5 +30,6 @@ __all__ = [
     "MoveItemTool",
     "ListDirectoryTool",
     "TerminalTool",
+    "AnalyzeTextFileTool",
     "AnalyzeImageTool"
 ]

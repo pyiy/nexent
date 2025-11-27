@@ -9,6 +9,7 @@ from nexent.core.utils.observer import MessageObserver
 from nexent.core.agents.agent_model import AgentRunInfo, ModelConfig, AgentConfig, ToolConfig
 from nexent.memory.memory_service import search_memory_in_levels
 
+from services.file_management_service import get_llm_model
 from services.vectordatabase_service import (
     ElasticSearchService,
     get_vector_db_core,
@@ -25,7 +26,7 @@ from database.client import minio_client
 from utils.model_name_utils import add_repo_to_name
 from utils.prompt_template_utils import get_agent_prompt_template
 from utils.config_utils import tenant_config_manager, get_model_name_from_config
-from consts.const import LOCAL_MCP_SERVER, MODEL_CONFIG_MAPPING, LANGUAGE
+from consts.const import LOCAL_MCP_SERVER, MODEL_CONFIG_MAPPING, LANGUAGE, DATA_PROCESS_SERVICE
 
 logger = logging.getLogger("create_agent_info")
 logger.setLevel(logging.DEBUG)
@@ -237,6 +238,12 @@ async def create_tool_config_list(agent_id, tenant_id, user_id):
                 "index_names": index_names,
                 "vdb_core": get_vector_db_core(),
                 "embedding_model": get_embedding_model(tenant_id=tenant_id),
+            }
+        elif tool_config.class_name == "AnalyzeTextFileTool":
+            tool_config.metadata = {
+                "llm_model": get_llm_model(tenant_id=tenant_id),
+                "storage_client": minio_client,
+                "data_process_service_url": DATA_PROCESS_SERVICE
             }
         elif tool_config.class_name == "AnalyzeImageTool":
             tool_config.metadata = {

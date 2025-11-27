@@ -1,7 +1,20 @@
+import sys
+import types
+from pathlib import Path
 from threading import Event
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+TEST_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = TEST_ROOT.parent
+for _path in (str(PROJECT_ROOT), str(TEST_ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+SDK_SOURCE_ROOT = PROJECT_ROOT / "sdk"
+sdk_namespace_module = types.ModuleType("sdk")
+sdk_namespace_module.__path__ = [str(SDK_SOURCE_ROOT)]
 
 # ---------------------------------------------------------------------------
 # Prepare mocks for external dependencies that are not required for this test
@@ -68,7 +81,96 @@ mock_core_agent_class = _TestCoreAgent
 
 # Very lightweight mock for openai path required by internal OpenAIModel import
 mock_openai_chat_completion_message = MagicMock()
+
+mock_botocore_module = types.ModuleType("botocore")
+mock_botocore_exceptions = types.ModuleType("botocore.exceptions")
+mock_botocore_exceptions.ClientError = MagicMock()
+mock_botocore_module.exceptions = mock_botocore_exceptions
+mock_botocore_client = types.ModuleType("botocore.client")
+mock_botocore_client.Config = MagicMock()
+mock_botocore_args = types.ModuleType("botocore.args")
+mock_botocore_args.ClientArgsCreator = MagicMock()
+mock_botocore_regions = types.ModuleType("botocore.regions")
+mock_botocore_regions.EndpointResolverBuiltins = MagicMock()
+mock_botocore_crt = types.ModuleType("botocore.crt")
+mock_botocore_crt.CRT_SUPPORTED_AUTH_TYPES = []
+
+
+class _MockMessageObserver:
+    def add_message(self, *args, **kwargs):
+        return None
+
+
+class _MockProcessType:
+    TOKEN_COUNT = "token_count"
+    FINAL_ANSWER = "final_answer"
+    ERROR = "error"
+
+
+mock_nexent_core_utils_module = types.ModuleType("nexent.core.utils")
+mock_nexent_core_utils_observer_module = types.ModuleType("nexent.core.utils.observer")
+mock_nexent_core_utils_observer_module.MessageObserver = _MockMessageObserver
+mock_nexent_core_utils_observer_module.ProcessType = _MockProcessType
+
+mock_prompt_template_utils_module = types.ModuleType(
+    "nexent.core.utils.prompt_template_utils"
+)
+mock_prompt_template_utils_module.get_prompt_template = MagicMock(return_value="")
+
+mock_tools_common_message_module = types.ModuleType(
+    "nexent.core.utils.tools_common_message"
+)
+
+
+class _EnumStub:
+    def __init__(self, value):
+        self.value = value
+
+
+class _MockToolCategory:
+    SEARCH = _EnumStub("search")
+    FILE = _EnumStub("file")
+    EMAIL = _EnumStub("email")
+    TERMINAL = _EnumStub("terminal")
+    MULTIMODAL = _EnumStub("multimodal")
+
+
+class _MockToolSign:
+    KNOWLEDGE_BASE = _EnumStub("a")
+    EXA_SEARCH = _EnumStub("b")
+    LINKUP_SEARCH = _EnumStub("c")
+    TAVILY_SEARCH = _EnumStub("d")
+    FILE_OPERATION = _EnumStub("f")
+    TERMINAL_OPERATION = _EnumStub("t")
+    MULTIMODAL_OPERATION = _EnumStub("m")
+
+
+mock_tools_common_message_module.ToolCategory = _MockToolCategory
+mock_tools_common_message_module.ToolSign = _MockToolSign
+
+mock_nexent_core_utils_module.observer = mock_nexent_core_utils_observer_module
+mock_nexent_core_utils_module.prompt_template_utils = mock_prompt_template_utils_module
+mock_nexent_core_utils_module.tools_common_message = mock_tools_common_message_module
+
+mock_nexent_core_models_module = types.ModuleType("nexent.core.models")
+mock_nexent_core_models_module.OpenAILongContextModel = MagicMock()
+mock_nexent_core_models_module.OpenAIVLModel = MagicMock()
+
+mock_nexent_core_module = types.ModuleType("nexent.core")
+mock_nexent_core_module.utils = mock_nexent_core_utils_module
+mock_nexent_core_module.models = mock_nexent_core_models_module
+mock_nexent_core_module.MessageObserver = _MockMessageObserver
+mock_nexent_module = types.ModuleType("nexent")
+mock_nexent_module.core = mock_nexent_core_module
+mock_nexent_storage_module = types.ModuleType("nexent.storage")
+mock_nexent_storage_module.MinIOStorageClient = MagicMock()
+mock_nexent_module.storage = mock_nexent_storage_module
+mock_nexent_multi_modal_module = types.ModuleType("nexent.multi_modal")
+mock_nexent_load_save_module = types.ModuleType("nexent.multi_modal.load_save_object")
+mock_nexent_load_save_module.LoadSaveObjectManager = MagicMock()
+mock_nexent_module.multi_modal = mock_nexent_multi_modal_module
 module_mocks = {
+    "sdk": sdk_namespace_module,
     "smolagents": mock_smolagents,
     "smolagents.tools": mock_smolagents_tools,
     "smolagents.agents": MagicMock(),
@@ -95,6 +197,23 @@ module_mocks = {
     "cryptography.hazmat.primitives.ciphers.base": MagicMock(),
     "cryptography.hazmat.bindings": MagicMock(),
     "cryptography.hazmat.bindings._rust": MagicMock(),
+    "boto3": MagicMock(),
+    "botocore": mock_botocore_module,
+    "botocore.client": mock_botocore_client,
+    "botocore.exceptions": mock_botocore_exceptions,
+    "botocore.args": mock_botocore_args,
+    "botocore.regions": mock_botocore_regions,
+    "botocore.crt": mock_botocore_crt,
+    "nexent": mock_nexent_module,
+    "nexent.core": mock_nexent_core_module,
+    "nexent.core.utils": mock_nexent_core_utils_module,
+    "nexent.core.utils.observer": mock_nexent_core_utils_observer_module,
+    "nexent.core.utils.prompt_template_utils": mock_prompt_template_utils_module,
+    "nexent.core.utils.tools_common_message": mock_tools_common_message_module,
+    "nexent.core.models": mock_nexent_core_models_module,
+    "nexent.storage": mock_nexent_storage_module,
+    "nexent.multi_modal": mock_nexent_multi_modal_module,
+    "nexent.multi_modal.load_save_object": mock_nexent_load_save_module,
     # Mock the OpenAIModel import
     "sdk.nexent.core.models.openai_llm": MagicMock(OpenAIModel=mock_openai_model_class),
     # Mock CoreAgent import
@@ -491,6 +610,48 @@ def test_create_local_tool_success(nexent_agent_instance):
     assert result == mock_tool_instance
 
 
+def test_create_local_tool_analyze_text_file_tool(nexent_agent_instance):
+    """Test AnalyzeTextFileTool creation injects observer and metadata."""
+    mock_analyze_tool_class = MagicMock()
+    mock_analyze_tool_instance = MagicMock()
+    mock_analyze_tool_class.return_value = mock_analyze_tool_instance
+
+    tool_config = ToolConfig(
+        class_name="AnalyzeTextFileTool",
+        name="analyze_text_file",
+        description="desc",
+        inputs="{}",
+        output_type="array",
+        params={"prompt": "describe this"},
+        source="local",
+        metadata={
+            "llm_model": "llm_model_obj",
+            "storage_client": "storage_client_obj",
+        "data_process_service_url": "https://example.com",
+        },
+    )
+
+    original_value = nexent_agent.__dict__.get("AnalyzeTextFileTool")
+    nexent_agent.__dict__["AnalyzeTextFileTool"] = mock_analyze_tool_class
+
+    try:
+        result = nexent_agent_instance.create_local_tool(tool_config)
+    finally:
+        if original_value is not None:
+            nexent_agent.__dict__["AnalyzeTextFileTool"] = original_value
+        elif "AnalyzeTextFileTool" in nexent_agent.__dict__:
+            del nexent_agent.__dict__["AnalyzeTextFileTool"]
+
+    mock_analyze_tool_class.assert_called_once_with(
+        observer=nexent_agent_instance.observer,
+        llm_model="llm_model_obj",
+        storage_client="storage_client_obj",
+        prompt="describe this",
+        data_process_service_url="https://example.com",
+    )
+    assert result == mock_analyze_tool_instance
+
+
 def test_create_local_tool_class_not_found(nexent_agent_instance):
     """Test create_local_tool raises ValueError when class is not found."""
     tool_config = ToolConfig(
@@ -651,6 +812,48 @@ def test_create_local_tool_knowledge_base_search_tool_with_none_defaults(nexent_
     assert mock_kb_tool_instance.vdb_core is None
     assert mock_kb_tool_instance.embedding_model is None
     assert result == mock_kb_tool_instance
+
+def test_create_local_tool_analyze_text_file_tool(nexent_agent_instance):
+    """Test AnalyzeTextFileTool creation injects observer and metadata."""
+    mock_analyze_tool_class = MagicMock()
+    mock_analyze_tool_instance = MagicMock()
+    mock_analyze_tool_class.return_value = mock_analyze_tool_instance
+
+    tool_config = ToolConfig(
+        class_name="AnalyzeTextFileTool",
+        name="analyze_text_file",
+        description="desc",
+        inputs="{}",
+        output_type="string",
+        params={"prompt": "describe this"},
+        source="local",
+        metadata={
+            "llm_model": "llm_model_obj",
+            "storage_client": "storage_client_obj",
+            "data_process_service_url": "DATA_PROCESS_SERVICE",
+
+        },
+    )
+
+    original_value = nexent_agent.__dict__.get("AnalyzeTextFileTool")
+    nexent_agent.__dict__["AnalyzeTextFileTool"] = mock_analyze_tool_class
+
+    try:
+        result = nexent_agent_instance.create_local_tool(tool_config)
+    finally:
+        if original_value is not None:
+            nexent_agent.__dict__["AnalyzeTextFileTool"] = original_value
+        elif "AnalyzeTextFileTool" in nexent_agent.__dict__:
+            del nexent_agent.__dict__["AnalyzeTextFileTool"]
+
+    mock_analyze_tool_class.assert_called_once_with(
+        observer=nexent_agent_instance.observer,
+        llm_model="llm_model_obj",
+        storage_client="storage_client_obj",
+        data_process_service_url="DATA_PROCESS_SERVICE",
+        prompt="describe this",
+    )
+    assert result == mock_analyze_tool_instance
 
 
 def test_create_local_tool_analyze_image_tool(nexent_agent_instance):
