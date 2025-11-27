@@ -25,6 +25,8 @@ from database.tool_db import (
 from database.user_tenant_db import get_all_tenant_ids
 from services.vectordatabase_service import get_embedding_model, get_vector_db_core
 from services.tenant_config_service import get_selected_knowledge_list
+from database.client import minio_client
+from services.image_service import get_vlm_model
 
 logger = logging.getLogger("tool_configuration_service")
 
@@ -611,6 +613,16 @@ def _validate_local_tool(
                 'index_names': index_names,
                 'vdb_core': vdb_core,
                 'embedding_model': embedding_model,
+            }
+            tool_instance = tool_class(**params)
+        elif tool_name == "analyze_image":
+            if not tenant_id or not user_id:
+                raise ToolExecutionException(f"Tenant ID and User ID are required for {tool_name} validation")
+            image_to_text_model = get_vlm_model(tenant_id=tenant_id)
+            params = {
+                **instantiation_params,
+                'vlm_model': image_to_text_model,
+                'storage_client': minio_client
             }
             tool_instance = tool_class(**params)
         else:
