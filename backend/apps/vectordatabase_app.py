@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Path, Query
 from fastapi.responses import JSONResponse
 
-from consts.model import HybridSearchRequest, IndexingResponse
+from consts.model import ChunkCreateRequest, ChunkUpdateRequest, HybridSearchRequest, IndexingResponse
 from nexent.vector_database.base import VectorDatabaseCore
 from services.vectordatabase_service import (
     ElasticSearchService,
@@ -226,6 +226,99 @@ def get_index_chunks(
             f"Error getting chunks for index '{index_name}': {error_msg}")
         raise HTTPException(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=f"Error getting chunks: {error_msg}")
+
+
+@router.post("/{index_name}/chunk")
+def create_chunk(
+        index_name: str = Path(..., description="Name of the index"),
+        payload: ChunkCreateRequest = Body(..., description="Chunk data"),
+        vdb_core: VectorDatabaseCore = Depends(get_vector_db_core),
+        authorization: Optional[str] = Header(None),
+):
+    """Create a manual chunk."""
+    try:
+        user_id, _ = get_current_user_id(authorization)
+        result = ElasticSearchService.create_chunk(
+            index_name=index_name,
+            chunk_request=payload,
+            vdb_core=vdb_core,
+            user_id=user_id,
+        )
+        return JSONResponse(status_code=HTTPStatus.OK, content=result)
+    except Exception as exc:
+        logger.error(
+            "Error creating chunk for index %s: %s", index_name, exc, exc_info=True
+        )
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc)
+        )
+
+
+@router.put("/{index_name}/chunk/{chunk_id}")
+def update_chunk(
+        index_name: str = Path(..., description="Name of the index"),
+        chunk_id: str = Path(..., description="Chunk identifier"),
+        payload: ChunkUpdateRequest = Body(...,
+                                           description="Chunk update payload"),
+        vdb_core: VectorDatabaseCore = Depends(get_vector_db_core),
+        authorization: Optional[str] = Header(None),
+):
+    """Update an existing chunk."""
+    try:
+        user_id, _ = get_current_user_id(authorization)
+        result = ElasticSearchService.update_chunk(
+            index_name=index_name,
+            chunk_id=chunk_id,
+            chunk_request=payload,
+            vdb_core=vdb_core,
+            user_id=user_id,
+        )
+        return JSONResponse(status_code=HTTPStatus.OK, content=result)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST, detail=str(exc))
+    except Exception as exc:
+        logger.error(
+            "Error updating chunk %s for index %s: %s",
+            chunk_id,
+            index_name,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc)
+        )
+
+
+@router.delete("/{index_name}/chunk/{chunk_id}")
+def delete_chunk(
+        index_name: str = Path(..., description="Name of the index"),
+        chunk_id: str = Path(..., description="Chunk identifier"),
+        vdb_core: VectorDatabaseCore = Depends(get_vector_db_core),
+        authorization: Optional[str] = Header(None),
+):
+    """Delete a chunk."""
+    try:
+        get_current_user_id(authorization)
+        result = ElasticSearchService.delete_chunk(
+            index_name=index_name,
+            chunk_id=chunk_id,
+            vdb_core=vdb_core,
+        )
+        return JSONResponse(status_code=HTTPStatus.OK, content=result)
+    except ValueError as exc:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail=str(exc))
+    except Exception as exc:
+        logger.error(
+            "Error deleting chunk %s for index %s: %s",
+            chunk_id,
+            index_name,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc)
+        )
 
 
 @router.post("/search/hybrid")

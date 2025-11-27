@@ -132,6 +132,49 @@ class VectorDatabaseCore(ABC):
         pass
 
     @abstractmethod
+    def create_chunk(self, index_name: str, chunk: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create a single chunk document inside the specified index.
+
+        Args:
+            index_name: Target index name.
+            chunk: Chunk payload to persist.
+
+        Returns:
+            Dict containing the created chunk metadata (including id/result).
+        """
+        pass
+
+    @abstractmethod
+    def update_chunk(self, index_name: str, chunk_id: str, chunk_updates: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update an existing chunk document.
+
+        Args:
+            index_name: Target index name.
+            chunk_id: Identifier of the chunk (ES _id or custom id field).
+            chunk_updates: Fields to update.
+
+        Returns:
+            Dict containing update status information.
+        """
+        pass
+
+    @abstractmethod
+    def delete_chunk(self, index_name: str, chunk_id: str) -> bool:
+        """
+        Delete a chunk document from the specified index.
+
+        Args:
+            index_name: Target index name.
+            chunk_id: Identifier of the chunk (ES _id or custom id field).
+
+        Returns:
+            bool indicating whether a document was deleted.
+        """
+        pass
+
+    @abstractmethod
     def count_documents(self, index_name: str) -> int:
         """
         Count the total number of documents in an index.

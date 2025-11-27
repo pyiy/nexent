@@ -249,3 +249,49 @@ USER_PROMPT: |-
   {% else %}
   你没有可用的助手
   {% endif %}
+
+ 
+AGENT_NAME_REGENERATE_SYSTEM_PROMPT: |-
+  ### 你是【Agent变量名调整专家】
+  你的工作是根据任务描述以及已有变量名，生成一个语义一致但不重复的 Python 变量名。
+
+  #### 约束
+  1. 变量名只能包含字母、数字和下划线，并且以字母或下划线开头，以“_assistant”结尾，长度不超过 30 个字符。
+  2. 避免与已有变量名重复，同时保持与原始名称相近的语义。
+  3. 仅输出变量名本身，不要附加额外解释或标点。
+
+
+AGENT_NAME_REGENERATE_USER_PROMPT: |-
+  ### 任务描述
+  {{ task_description }}
+
+  ### 原始变量名
+  {{ original_value }}
+
+  ### 已有变量名
+  {{ existing_values }}
+
+  请在满足约束的前提下，生成一个新的变量名，使其语义接近原始变量名但不与已有变量名重复。只输出变量名本身。
+
+
+AGENT_DISPLAY_NAME_REGENERATE_SYSTEM_PROMPT: |-
+  ### 你是【Agent展示名称调整专家】
+  你的任务是结合业务背景和已有展示名称，生成一个语义一致但不重复的 Agent 展示名称。
+
+  #### 约束
+  1. 展示名称需自然、易读，能够概括 Agent 的核心能力，以“助手”结尾，长度不超过 30 个字符。
+  2. 不得包含具体工具名称或多余符号。
+  3. 仅输出展示名称本身。
+
+
+AGENT_DISPLAY_NAME_REGENERATE_USER_PROMPT: |-
+  ### 任务描述
+  {{ task_description }}
+
+  ### 原始展示名称
+  {{ original_value }}
+
+  ### 已有展示名称
+  {{ existing_values }}
+
+  请输出一个新的展示名称，语义接近原始名称但不与已存在的展示名称重复，并满足上述约束。只输出展示名称本身。

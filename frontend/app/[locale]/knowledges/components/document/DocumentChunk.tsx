@@ -10,11 +10,13 @@ import {
   App,
   Spin,
   Tag,
+  Form,
+  Modal,
   Tooltip as AntdTooltip,
   Pagination,
   Input,
-  Select,
 } from "antd";
+import { WarningFilled } from "@ant-design/icons";
 import {
   Download,
   ScanText,
@@ -40,10 +42,17 @@ import {
 interface Chunk {
   id: string;
   content: string;
+  title?: string;
   path_or_url?: string;
   filename?: string;
   create_time?: string;
   score?: number; // Search score (0-1 range) - only present in search results
+}
+
+interface ChunkFormValues {
+  title?: string;
+  filename?: string;
+  content: string;
 }
 
 interface DocumentChunkProps {
@@ -57,6 +66,8 @@ interface DocumentChunkProps {
 const PAGE_SIZE = 10;
 
 const TABS_ROOT_CLASS = "document-chunk-tabs";
+
+const { TextArea } = Input;
 
 const DocumentChunk: React.FC<DocumentChunkProps> = ({
   knowledgeBaseName,
@@ -81,31 +92,36 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
     page: 1,
     pageSize: PAGE_SIZE,
   });
-  const [searchType, setSearchType] = useState<"document" | "chunk">("chunk");
   const [searchValue, setSearchValue] = useState<string>("");
-  const [filteredDocumentIds, setFilteredDocumentIds] = useState<
-    string[] | null
-  >(null);
   const [chunkSearchResult, setChunkSearchResult] = useState<Chunk[] | null>(
     null
   );
-  const [chunkSearchTotal, setChunkSearchTotal] = useState<number>(0);
   const [chunkSearchLoading, setChunkSearchLoading] = useState(false);
+  const [isChunkModalOpen, setIsChunkModalOpen] = useState(false);
+  const [chunkModalMode, setChunkModalMode] = useState<"create" | "edit">(
+    "create"
+  );
+  const [chunkSubmitting, setChunkSubmitting] = useState(false);
+  const [editingChunk, setEditingChunk] = useState<Chunk | null>(null);
+  const [chunkForm] = Form.useForm<ChunkFormValues>();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [chunkToDelete, setChunkToDelete] = useState<Chunk | null>(null);
+  const [tooltipResetKey, setTooltipResetKey] = useState(0);
 
   const resetChunkSearch = React.useCallback(() => {
     setChunkSearchResult(null);
-    setChunkSearchTotal(0);
     setChunkSearchLoading(false);
   }, []);
 
-  const displayedDocuments = React.useMemo(() => {
-    if (filteredDocumentIds === null) {
-      return documents;
-    }
-    return documents.filter((doc) => filteredDocumentIds.includes(doc.id));
-  }, [documents, filteredDocumentIds]);
-
   const isChunkSearchActive = chunkSearchResult !== null;
+  const activeDocument = React.useMemo(
+    () => documents.find((doc) => doc.id === activeDocumentKey),
+    [documents, activeDocumentKey]
+  );
+
+  const forceCloseTooltips = React.useCallback(() => {
+    setTooltipResetKey((prev) => prev + 1);
+  }, []);
 
   // Determine if in read-only mode
   const isReadOnlyMode = React.useMemo(() => {
@@ -120,10 +136,7 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
 
   // Set active document when documents change
   useEffect(() => {
-    const sourceDocuments =
-      filteredDocumentIds !== null ? displayedDocuments : documents;
-
-    if (sourceDocuments.length === 0) {
+    if (documents.length === 0) {
       if (activeDocumentKey) {
         setActiveDocumentKey("");
       }
@@ -132,47 +145,43 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
       return;
     }
 
-    const hasActiveDocument = sourceDocuments.some(
+    const hasActiveDocument = documents.some(
       (doc) => doc.id === activeDocumentKey
     );
 
     if (!hasActiveDocument) {
-      setActiveDocumentKey(sourceDocuments[0].id);
+      setActiveDocumentKey(documents[0].id);
       setPagination((prev) => ({ ...prev, page: 1 }));
     }
-  }, [documents, displayedDocuments, filteredDocumentIds, activeDocumentKey]);
+  }, [documents, activeDocumentKey]);
 
   // Load chunks for active document with server-side pagination
-  useEffect(() => {
-    const loadChunks = async () => {
-      if (!knowledgeBaseName || !activeDocumentKey) {
-        return;
-      }
+  const loadChunks = React.useCallback(async () => {
+    if (!knowledgeBaseName || !activeDocumentKey) {
+      return;
+    }
 
-      setLoading(true);
-      try {
-        const result = await knowledgeBaseService.previewChunksPaginated(
-          knowledgeBaseName,
-          pagination.page,
-          pagination.pageSize,
-          activeDocumentKey
-        );
+    setLoading(true);
+    try {
+      const result = await knowledgeBaseService.previewChunksPaginated(
+        knowledgeBaseName,
+        pagination.page,
+        pagination.pageSize,
+        activeDocumentKey
+      );
 
-        setChunks(result.chunks || []);
-        setTotal(result.total || 0);
-        setDocumentChunkCounts((prev) => ({
-          ...prev,
-          [activeDocumentKey]: result.total || 0,
-        }));
-      } catch (error) {
-        log.error("Failed to load chunks:", error);
-        message.error(t("document.chunk.error.loadFailed"));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadChunks();
+      setChunks(result.chunks || []);
+      setTotal(result.total || 0);
+      setDocumentChunkCounts((prev) => ({
+        ...prev,
+        [activeDocumentKey]: result.total || 0,
+      }));
+    } catch (error) {
+      log.error("Failed to load chunks:", error);
+      message.error(t("document.chunk.error.loadFailed"));
+    } finally {
+      setLoading(false);
+    }
   }, [
     knowledgeBaseName,
     activeDocumentKey,
@@ -181,6 +190,10 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
     message,
     t,
   ]);
+
+  useEffect(() => {
+    void loadChunks();
+  }, [loadChunks]);
 
   useEffect(() => {
     if (documents.length === 0) {
@@ -221,7 +234,6 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
     setChunks([]);
     setTotal(documentChunkCounts[key] ?? 0);
     setPagination((prev) => ({ ...prev, page: 1 }));
-    resetChunkSearch();
   };
 
   // Handle pagination change
@@ -240,7 +252,6 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
   // Clear search input and reset all search states
   const handleClearSearch = React.useCallback(() => {
     setSearchValue("");
-    setFilteredDocumentIds(null);
     resetChunkSearch();
   }, [resetChunkSearch]);
 
@@ -248,45 +259,7 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
     const trimmedValue = searchValue.trim();
 
     if (!trimmedValue) {
-      setFilteredDocumentIds(null);
       resetChunkSearch();
-      return;
-    }
-
-    if (searchType === "document") {
-      resetChunkSearch();
-      const searchLower = trimmedValue.toLowerCase();
-      const matchedDocs = documents.filter((doc) => {
-        const fullName = (doc.name || "").trim();
-        const displayName = getDisplayName(fullName);
-        return (
-          fullName.toLowerCase().includes(searchLower) ||
-          displayName.toLowerCase().includes(searchLower)
-        );
-      });
-
-      if (matchedDocs.length === 0) {
-        setFilteredDocumentIds([]);
-        setActiveDocumentKey("");
-        setChunks([]);
-        setTotal(0);
-        message.warning(t("document.chunk.search.noDocument"));
-        return;
-      }
-
-      setFilteredDocumentIds(matchedDocs.map((doc) => doc.id));
-
-      const hasActive = matchedDocs.some((doc) => doc.id === activeDocumentKey);
-
-      if (!hasActive) {
-        setActiveDocumentKey(matchedDocs[0].id);
-        setPagination((prev) => ({ ...prev, page: 1 }));
-      }
-      return;
-    }
-
-    if (!activeDocumentKey) {
-      message.warning(t("document.chunk.search.noActiveDocument"));
       return;
     }
 
@@ -295,9 +268,7 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
       return;
     }
 
-    setFilteredDocumentIds(null);
     setChunkSearchResult([]);
-    setChunkSearchTotal(0);
     setChunkSearchLoading(true);
 
     try {
@@ -309,24 +280,21 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
         }
       );
 
-      const filteredChunks = (response.results || [])
-        .map((item) => {
-          // Backend returns document fields at the top level
-          return {
-            id: item.id || "",
-            content: item.content || "",
-            path_or_url: item.path_or_url,
-            filename: item.filename,
-            create_time: item.create_time,
-            score: item.score, // Preserve search score for display
-          };
-        })
-        .filter((chunk) => chunk.path_or_url === activeDocumentKey);
+      const parsedChunks = (response.results || []).map((item) => {
+        // Backend returns document fields at the top level
+        return {
+          id: item.id || "",
+          content: item.content || "",
+          path_or_url: item.path_or_url,
+          filename: item.filename,
+          create_time: item.create_time,
+          score: item.score, // Preserve search score for display
+        };
+      });
 
-      setChunkSearchResult(filteredChunks);
-      setChunkSearchTotal(filteredChunks.length);
+      setChunkSearchResult(parsedChunks);
 
-      if (filteredChunks.length === 0) {
+      if (parsedChunks.length === 0) {
         message.info(t("document.chunk.search.noChunk"));
       }
     } catch (error) {
@@ -337,17 +305,21 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
       setChunkSearchLoading(false);
     }
   }, [
-    activeDocumentKey,
-    documents,
-    getDisplayName,
     knowledgeBaseName,
     message,
     pagination.pageSize,
     resetChunkSearch,
-    searchType,
     searchValue,
     t,
   ]);
+
+  const refreshChunks = React.useCallback(async () => {
+    if (isChunkSearchActive && searchValue.trim()) {
+      await handleSearch();
+      return;
+    }
+    await loadChunks();
+  }, [handleSearch, isChunkSearchActive, loadChunks, searchValue]);
 
   // Download chunk as txt file
   const handleDownloadChunk = (chunk: Chunk) => {
@@ -366,6 +338,152 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
       log.error("Failed to download chunk:", error);
       message.error(t("document.chunk.error.downloadFailed"));
     }
+  };
+
+  const openCreateChunkModal = () => {
+    if (!activeDocumentKey) {
+      message.warning(t("document.chunk.search.noActiveDocument"));
+      return;
+    }
+    forceCloseTooltips();
+    setChunkModalMode("create");
+    setEditingChunk(null);
+    chunkForm.resetFields();
+    chunkForm.setFieldsValue({
+      filename: activeDocument?.name || "",
+      content: "",
+    });
+    setIsChunkModalOpen(true);
+  };
+
+  const openEditChunkModal = (chunk: Chunk) => {
+    if (!chunk.id) {
+      message.error(t("document.chunk.error.missingChunkId"));
+      return;
+    }
+
+    forceCloseTooltips();
+    setChunkModalMode("edit");
+    setEditingChunk(chunk);
+    chunkForm.resetFields();
+    chunkForm.setFieldsValue({
+      filename: chunk.filename || activeDocument?.name || "",
+      content: chunk.content || "",
+    });
+    setIsChunkModalOpen(true);
+  };
+
+  const closeChunkModal = () => {
+    setIsChunkModalOpen(false);
+    setEditingChunk(null);
+    chunkForm.resetFields();
+    forceCloseTooltips();
+  };
+
+  const handleChunkSubmit = async () => {
+    if (!knowledgeBaseName) {
+      message.error(t("document.chunk.error.loadFailed"));
+      return;
+    }
+    if (!activeDocumentKey) {
+      message.warning(t("document.chunk.search.noActiveDocument"));
+      return;
+    }
+
+    try {
+      const values = await chunkForm.validateFields();
+      setChunkSubmitting(true);
+      if (chunkModalMode === "create") {
+        await knowledgeBaseService.createChunk(knowledgeBaseName, {
+          content: values.content,
+          filename: values.filename?.trim() || undefined,
+          path_or_url: activeDocumentKey,
+        });
+        message.success(t("document.chunk.success.create"));
+        resetChunkSearch();
+      } else {
+        if (!editingChunk?.id) {
+          message.error(t("document.chunk.error.missingChunkId"));
+          return;
+        }
+        await knowledgeBaseService.updateChunk(
+          knowledgeBaseName,
+          editingChunk.id,
+          {
+            content: values.content,
+            filename: values.filename?.trim() || undefined,
+          }
+        );
+        message.success(t("document.chunk.success.update"));
+      }
+      closeChunkModal();
+      await refreshChunks();
+    } catch (error) {
+      if (error instanceof Error) {
+        log.error("Failed to submit chunk:", error);
+      }
+      if (chunkModalMode === "create") {
+        message.error(
+          error instanceof Error && error.message
+            ? error.message
+            : t("document.chunk.error.createFailed")
+        );
+      } else {
+        message.error(
+          error instanceof Error && error.message
+            ? error.message
+            : t("document.chunk.error.updateFailed")
+        );
+      }
+    } finally {
+      setChunkSubmitting(false);
+    }
+  };
+
+  const handleDeleteChunk = (chunk: Chunk) => {
+    if (!chunk.id) {
+      message.error(t("document.chunk.error.missingChunkId"));
+      return;
+    }
+    if (!knowledgeBaseName) {
+      message.error(t("document.chunk.error.deleteFailed"));
+      return;
+    }
+
+    forceCloseTooltips();
+    setChunkToDelete(chunk);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!chunkToDelete?.id || !knowledgeBaseName) {
+      return;
+    }
+
+    try {
+      await knowledgeBaseService.deleteChunk(
+        knowledgeBaseName,
+        chunkToDelete.id
+      );
+      message.success(t("document.chunk.success.delete"));
+      setDeleteModalOpen(false);
+      setChunkToDelete(null);
+      forceCloseTooltips();
+      await refreshChunks();
+    } catch (error) {
+      log.error("Failed to delete chunk:", error);
+      message.error(
+        error instanceof Error && error.message
+          ? error.message
+          : t("document.chunk.error.deleteFailed")
+      );
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModalOpen(false);
+    setChunkToDelete(null);
+    forceCloseTooltips();
   };
 
   const renderDocumentLabel = (doc: Document, chunkCount: number) => {
@@ -391,15 +509,36 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
     );
   };
 
-  const tabItems = displayedDocuments.map((doc) => {
-    const chunkCount = documentChunkCounts[doc.id] ?? doc.chunk_num ?? 0;
+  const chunkSearchResultMap = React.useMemo(() => {
+    if (!chunkSearchResult) {
+      return null;
+    }
+
+    return chunkSearchResult.reduce<Record<string, Chunk[]>>((acc, chunk) => {
+      const docId = chunk.path_or_url;
+      if (!docId) {
+        return acc;
+      }
+      if (!acc[docId]) {
+        acc[docId] = [];
+      }
+      acc[docId].push(chunk);
+      return acc;
+    }, {});
+  }, [chunkSearchResult]);
+
+  const tabItems = documents.map((doc) => {
+    const chunkCount = isChunkSearchActive
+      ? chunkSearchResultMap?.[doc.id]?.length ?? 0
+      : documentChunkCounts[doc.id] ?? doc.chunk_num ?? 0;
     const isActive = doc.id === activeDocumentKey;
+    const chunkSearchChunks = chunkSearchResultMap?.[doc.id] ?? [];
     const docChunksData = isActive
       ? isChunkSearchActive
         ? {
-            chunks: chunkSearchResult ?? [],
-            total: chunkSearchTotal,
-            paginatedChunks: chunkSearchResult ?? [],
+            chunks: chunkSearchChunks,
+            total: chunkSearchChunks.length,
+            paginatedChunks: chunkSearchChunks,
           }
         : { chunks, total, paginatedChunks: chunks }
       : { chunks: [], total: 0, paginatedChunks: [] };
@@ -455,7 +594,7 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium border rounded-md"
                               style={{
                                 backgroundColor: getScoreColor(chunk.score),
-                                color: "#fff",
+                                color: "#000",
                                 borderColor: getScoreColor(chunk.score),
                               }}
                             >
@@ -473,9 +612,7 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
                                 <Button
                                   type="text"
                                   icon={<SquarePen size={16} />}
-                                  onClick={() => {
-                                    // TODO: Implement edit functionality
-                                  }}
+                                  onClick={() => openEditChunkModal(chunk)}
                                   size="small"
                                   className="self-center"
                                 />
@@ -499,23 +636,23 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
                               {t("document.chunk.tooltip.download")}
                             </TooltipContent>
                           </UITooltip>
-                          <UITooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                type="text"
-                                danger
-                                icon={<Trash2 size={16} />}
-                                onClick={() => {
-                                  // TODO: Implement delete functionality
-                                }}
-                                size="small"
-                                className="self-center"
-                              />
-                            </TooltipTrigger>
-                            <TooltipContent className="font-normal">
-                              {t("document.chunk.tooltip.delete")}
-                            </TooltipContent>
-                          </UITooltip>
+                          {!isReadOnlyMode && (
+                            <UITooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="text"
+                                  danger
+                                  icon={<Trash2 size={16} />}
+                                  onClick={() => handleDeleteChunk(chunk)}
+                                  size="small"
+                                  className="self-center"
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent className="font-normal">
+                                {t("document.chunk.tooltip.delete")}
+                              </TooltipContent>
+                            </UITooltip>
+                          )}
                         </div>
                       </div>
                     }
@@ -542,12 +679,12 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
   }
 
   const activeDocumentTotal = isChunkSearchActive
-    ? chunkSearchTotal
+    ? chunkSearchResultMap?.[activeDocumentKey]?.length ?? 0
     : documentChunkCounts[activeDocumentKey] ?? total ?? 0;
   const shouldShowPagination = !isChunkSearchActive && activeDocumentTotal > 0;
 
   return (
-    <TooltipProvider>
+    <TooltipProvider key={tooltipResetKey}>
       <div className="flex h-full w-full flex-col min-h-0 overflow-hidden">
         {/* Search and Add Button Bar */}
         <div className="flex items-center justify-end gap-2 px-2 py-3 border-b border-gray-200 shrink-0">
@@ -560,25 +697,6 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
                 void handleSearch();
               }}
               style={{ width: 320 }}
-              addonBefore={
-                <Select
-                  value={searchType}
-                  onChange={setSearchType}
-                  variant="borderless"
-                  style={{ width: 85 }}
-                  options={[
-                    {
-                      label: t("document.chunk.search.chunk"),
-                      value: "chunk",
-                    },
-                    {
-                      label: t("document.chunk.search.document"),
-                      value: "document",
-                    },
-                  ]}
-                  popupMatchSelectWidth={false}
-                />
-              }
               suffix={
                 <div className="flex items-center gap-1">
                   {searchValue && (
@@ -597,9 +715,7 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
                       void handleSearch();
                     }}
                     size="small"
-                    loading={
-                      searchType === "chunk" ? chunkSearchLoading : false
-                    }
+                    loading={chunkSearchLoading}
                   />
                 </div>
               }
@@ -611,9 +727,7 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
                 <Button
                   type="text"
                   icon={<FilePlus2 size={16} />}
-                  onClick={() => {
-                    // TODO: Implement add functionality
-                  }}
+                  onClick={openCreateChunkModal}
                 ></Button>
               </TooltipTrigger>
               <TooltipContent className="font-normal">
@@ -652,6 +766,80 @@ const DocumentChunk: React.FC<DocumentChunkProps> = ({
           </div>
         )}
       </div>
+      <Modal
+        centered
+        destroyOnClose
+        open={isChunkModalOpen}
+        title={
+          chunkModalMode === "create"
+            ? t("document.chunk.form.createTitle")
+            : t("document.chunk.form.editTitle")
+        }
+        onCancel={closeChunkModal}
+        onOk={() => {
+          void handleChunkSubmit();
+        }}
+        okText={t("common.save")}
+        cancelText={t("common.cancel")}
+        confirmLoading={chunkSubmitting}
+      >
+        <Form form={chunkForm} layout="vertical">
+          <Form.Item
+            label={
+              <span className="font-semibold ml-1">
+                {t("document.chunk.form.documentName")}
+              </span>
+            }
+          >
+            <div className="pl-4 text-gray-700">
+              {getDisplayName(activeDocument?.name || "")}
+            </div>
+          </Form.Item>
+          <Form.Item
+            label={
+              <span className="font-semibold ml-1">
+                {t("document.chunk.form.content")}
+              </span>
+            }
+            name="content"
+          >
+            <TextArea
+              style={{ height: "40vh", resize: "vertical" }}
+              placeholder={t("document.chunk.form.contentPlaceholder", {
+                defaultValue: "Enter chunk content",
+              })}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+      <Modal
+        title={t("document.chunk.confirm.deleteTitle")}
+        open={deleteModalOpen}
+        onCancel={handleDeleteCancel}
+        centered
+        footer={
+          <div className="flex justify-end mt-6 gap-4">
+            <Button onClick={handleDeleteCancel}>{t("common.cancel")}</Button>
+            <Button type="primary" danger onClick={handleDeleteConfirm}>
+              {t("common.delete")}
+            </Button>
+          </div>
+        }
+      >
+        <div className="py-2">
+          <div className="flex items-center">
+            <WarningFilled
+              className="text-yellow-500 mt-1 mr-2"
+              style={{ fontSize: "48px" }}
+            />
+            <div className="ml-3 mt-2">
+              <div className="text-sm leading-6">
+                {t("document.chunk.confirm.deleteContent")}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </TooltipProvider>
   );
 };
