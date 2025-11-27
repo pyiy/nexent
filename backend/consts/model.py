@@ -175,6 +175,31 @@ class IndexingResponse(BaseModel):
     total_submitted: int
 
 
+class ChunkCreateRequest(BaseModel):
+    """Request payload for manual chunk creation."""
+
+    content: str = Field(..., min_length=1, description="Chunk content")
+    title: Optional[str] = Field(None, description="Optional chunk title")
+    filename: Optional[str] = Field(None, description="Associated file name")
+    path_or_url: Optional[str] = Field(None, description="Source path or URL")
+    chunk_id: Optional[str] = Field(
+        None, description="Explicit chunk identifier")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional chunk metadata")
+
+
+class ChunkUpdateRequest(BaseModel):
+    """Request payload for chunk updates."""
+
+    content: Optional[str] = Field(None, description="Updated chunk content")
+    title: Optional[str] = Field(None, description="Updated chunk title")
+    filename: Optional[str] = Field(None, description="Updated file name")
+    path_or_url: Optional[str] = Field(
+        None, description="Updated source path or URL")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata updates")
+
+
 class HybridSearchRequest(BaseModel):
     """Request payload for hybrid knowledge-base searches."""
     query: str = Field(..., min_length=1,

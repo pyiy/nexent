@@ -669,6 +669,95 @@ class KnowledgeBaseService {
     }
   }
 
+  async createChunk(
+    indexName: string,
+    payload: {
+      content: string;
+      filename?: string;
+      path_or_url: string;
+      metadata?: Record<string, unknown>;
+    }
+  ): Promise<{ chunk_id: string }> {
+    try {
+      const response = await fetch(
+        API_ENDPOINTS.knowledgeBase.chunk(indexName),
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        }
+      );
+      const data = await response.json();
+
+      if (data.status !== "success") {
+        throw new Error(data.message || "Failed to create chunk");
+      }
+
+      return { chunk_id: data.chunk_id };
+    } catch (error) {
+      log.error("Error creating chunk:", error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Failed to create chunk");
+    }
+  }
+
+  async updateChunk(
+    indexName: string,
+    chunkId: string,
+    payload: {
+      content?: string;
+      filename?: string;
+      metadata?: Record<string, unknown>;
+    }
+  ): Promise<void> {
+    try {
+      const response = await fetch(
+        API_ENDPOINTS.knowledgeBase.chunkDetail(indexName, chunkId),
+        {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        }
+      );
+      const data = await response.json();
+
+      if (data.status !== "success") {
+        throw new Error(data.message || "Failed to update chunk");
+      }
+    } catch (error) {
+      log.error("Error updating chunk:", error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Failed to update chunk");
+    }
+  }
+
+  async deleteChunk(indexName: string, chunkId: string): Promise<void> {
+    try {
+      const response = await fetch(
+        API_ENDPOINTS.knowledgeBase.chunkDetail(indexName, chunkId),
+        {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        }
+      );
+      const data = await response.json();
+
+      if (data.status !== "success") {
+        throw new Error(data.message || "Failed to delete chunk");
+      }
+    } catch (error) {
+      log.error("Error deleting chunk:", error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Failed to delete chunk");
+    }
+  }
+
   // Hybrid search to retrieve chunks via combined semantic and accurate scoring
   async hybridSearch(
     indexName: string,
