@@ -1144,6 +1144,70 @@ class TestElasticSearchService(unittest.TestCase):
             )
         self.assertIn("Error executing hybrid search", str(context.exception))
 
+    def test_search_hybrid_weight_accurate_boundary_values(self):
+        """Test search_hybrid with different weight_accurate values to ensure line 1146 is covered."""
+        # Test with weight_accurate = 0.0 (semantic only)
+        self.mock_vdb_core.hybrid_search.return_value = [
+            {
+                "document": {"title": "Doc1", "content": "Content1"},
+                "score": 0.90,
+                "index": "test_index",
+            }
+        ]
+
+        result = ElasticSearchService.search_hybrid(
+            index_names=["test_index"],
+            query="test query",
+            tenant_id="test_tenant",
+            top_k=10,
+            weight_accurate=0.0,
+            vdb_core=self.mock_vdb_core
+        )
+        self.assertEqual(len(result["results"]), 1)
+        self.mock_vdb_core.hybrid_search.assert_called_with(
+            index_names=["test_index"],
+            query_text="test query",
+            embedding_model=self.mock_embedding,
+            top_k=10,
+            weight_accurate=0.0
+        )
+
+        # Test with weight_accurate = 1.0 (accurate only)
+        self.mock_vdb_core.hybrid_search.reset_mock()
+        result = ElasticSearchService.search_hybrid(
+            index_names=["test_index"],
+            query="test query",
+            tenant_id="test_tenant",
+            top_k=10,
+            weight_accurate=1.0,
+            vdb_core=self.mock_vdb_core
+        )
+        self.mock_vdb_core.hybrid_search.assert_called_with(
+            index_names=["test_index"],
+            query_text="test query",
+            embedding_model=self.mock_embedding,
+            top_k=10,
+            weight_accurate=1.0
+        )
+
+        # Test with weight_accurate = 0.3 (more semantic)
+        self.mock_vdb_core.hybrid_search.reset_mock()
+        result = ElasticSearchService.search_hybrid(
+            index_names=["test_index"],
+            query="test query",
+            tenant_id="test_tenant",
+            top_k=10,
+            weight_accurate=0.3,
+            vdb_core=self.mock_vdb_core
+        )
+        self.mock_vdb_core.hybrid_search.assert_called_with(
+            index_names=["test_index"],
+            query_text="test query",
+            embedding_model=self.mock_embedding,
+            top_k=10,
+            weight_accurate=0.3
+        )
+
     def test_health_check_healthy(self):
         """
         Test health check when Elasticsearch is healthy.
