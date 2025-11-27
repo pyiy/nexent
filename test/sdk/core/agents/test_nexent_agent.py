@@ -152,8 +152,13 @@ mock_nexent_core_utils_module.observer = mock_nexent_core_utils_observer_module
 mock_nexent_core_utils_module.prompt_template_utils = mock_prompt_template_utils_module
 mock_nexent_core_utils_module.tools_common_message = mock_tools_common_message_module
 
+mock_nexent_core_models_module = types.ModuleType("nexent.core.models")
+mock_nexent_core_models_module.OpenAILongContextModel = MagicMock()
+mock_nexent_core_models_module.OpenAIVLModel = MagicMock()
+
 mock_nexent_core_module = types.ModuleType("nexent.core")
 mock_nexent_core_module.utils = mock_nexent_core_utils_module
+mock_nexent_core_module.models = mock_nexent_core_models_module
 mock_nexent_core_module.MessageObserver = _MockMessageObserver
 mock_nexent_module = types.ModuleType("nexent")
 mock_nexent_module.core = mock_nexent_core_module
@@ -205,6 +210,7 @@ module_mocks = {
     "nexent.core.utils.observer": mock_nexent_core_utils_observer_module,
     "nexent.core.utils.prompt_template_utils": mock_prompt_template_utils_module,
     "nexent.core.utils.tools_common_message": mock_tools_common_message_module,
+    "nexent.core.models": mock_nexent_core_models_module,
     "nexent.storage": mock_nexent_storage_module,
     "nexent.multi_modal": mock_nexent_multi_modal_module,
     "nexent.multi_modal.load_save_object": mock_nexent_load_save_module,

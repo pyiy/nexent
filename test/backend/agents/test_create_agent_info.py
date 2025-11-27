@@ -5,6 +5,10 @@ import importlib.util
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch, Mock, PropertyMock
 
+from test.common.env_test_utils import bootstrap_env
+
+env_state = bootstrap_env()
+consts_const = env_state["mock_const"]
 TEST_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = TEST_ROOT.parent
 
@@ -12,15 +16,6 @@ PROJECT_ROOT = TEST_ROOT.parent
 for _path in (str(PROJECT_ROOT), str(TEST_ROOT)):
     if _path not in sys.path:
         sys.path.insert(0, _path)
-from test.common.env_test_utils import bootstrap_env
-
-env_state = bootstrap_env()
-consts_const = env_state["mock_const"]
-
-from test.common.env_test_utils import bootstrap_env
-
-env_state = bootstrap_env()
-consts_const = env_state["mock_const"]
 
 # Utilities ---------------------------------------------------------------
 def _create_stub_module(name: str, **attrs):
@@ -47,30 +42,6 @@ consts_const.LOCAL_MCP_SERVER = "http://localhost:5011"
 consts_const.MODEL_CONFIG_MAPPING = {"llm": "llm_config"}
 consts_const.LANGUAGE = {"ZH": "zh"}
 consts_const.DATA_PROCESS_SERVICE = "https://example.com/data-process"
-# Utilities ---------------------------------------------------------------
-def _create_stub_module(name: str, **attrs):
-    """Return a lightweight module stub with the provided attributes."""
-    module = types.ModuleType(name)
-    for attr_name, attr_value in attrs.items():
-        setattr(module, attr_name, attr_value)
-    return module
-
-
-# Configure required constants via shared bootstrap env
-consts_const.MINIO_ENDPOINT = "http://localhost:9000"
-consts_const.MINIO_ACCESS_KEY = "test_access_key"
-consts_const.MINIO_SECRET_KEY = "test_secret_key"
-consts_const.MINIO_REGION = "us-east-1"
-consts_const.MINIO_DEFAULT_BUCKET = "test-bucket"
-consts_const.POSTGRES_HOST = "localhost"
-consts_const.POSTGRES_USER = "test_user"
-consts_const.NEXENT_POSTGRES_PASSWORD = "test_password"
-consts_const.POSTGRES_DB = "test_db"
-consts_const.POSTGRES_PORT = 5432
-consts_const.DEFAULT_TENANT_ID = "default_tenant"
-consts_const.LOCAL_MCP_SERVER = "http://localhost:5011"
-consts_const.MODEL_CONFIG_MAPPING = {"llm": "llm_config"}
-consts_const.LANGUAGE = {"ZH": "zh"}
 
 # Mock utils module
 utils_mock = MagicMock()
@@ -125,13 +96,14 @@ sys.modules['utils.config_utils'] = MagicMock()
 sys.modules['utils.langchain_utils'] = MagicMock()
 sys.modules['utils.model_name_utils'] = MagicMock()
 sys.modules['langchain_core.tools'] = MagicMock()
-sys.modules['services.memory_config_service'] = MagicMock()
 # Build services module hierarchy with minimal functionality
 services_module = _create_stub_module("services")
 sys.modules['services'] = services_module
 sys.modules['services.image_service'] = _create_stub_module(
     "services.image_service", get_vlm_model=MagicMock(return_value="stub_vlm")
 )
+sys.modules['services.memory_config_service'] = MagicMock()
+# Extend services hierarchy with additional stubs
 sys.modules['services.file_management_service'] = _create_stub_module(
     "services.file_management_service",
     get_llm_model=MagicMock(return_value="stub_llm_model"),
@@ -140,18 +112,16 @@ sys.modules['services.tool_configuration_service'] = _create_stub_module(
     "services.tool_configuration_service",
     initialize_tools_on_startup=AsyncMock(),
 )
+sys.modules['nexent.memory.memory_service'] = MagicMock()
+
 # Build top-level nexent module to avoid importing the real package
-nexent_module = _create_stub_module(
-    "nexent",
-    MessageObserver=mock_message_observer,
-)
+nexent_module = _create_stub_module("nexent", MessageObserver=mock_message_observer)
 sys.modules['nexent'] = nexent_module
 
 # Create nested modules for nexent.core to satisfy imports safely
 sys.modules['nexent.core'] = _create_stub_module("nexent.core")
 sys.modules['nexent.core.agents'] = _create_stub_module("nexent.core.agents")
 sys.modules['nexent.core.utils'] = _create_stub_module("nexent.core.utils")
-sys.modules['nexent.memory.memory_service'] = MagicMock()
 
 # Create mock classes that might be imported
 mock_agent_config = MagicMock()
@@ -397,6 +367,42 @@ class TestCreateToolConfigList:
             assert last_call[1]['class_name'] == "KnowledgeBaseSearchTool"
 
     @pytest.mark.asyncio
+    async def test_create_tool_config_list_with_analyze_image_tool(self):
+        """Ensure AnalyzeImageTool receives VLM model metadata."""
+        mock_tool_instance = MagicMock()
+        mock_tool_instance.class_name = "AnalyzeImageTool"
+        mock_tool_config.return_value = mock_tool_instance
+
+        with patch('backend.agents.create_agent_info.discover_langchain_tools', return_value=[]), \
+                patch('backend.agents.create_agent_info.search_tools_for_sub_agent') as mock_search_tools, \
+                patch('backend.agents.create_agent_info.get_vlm_model') as mock_get_vlm_model, \
+                patch('backend.agents.create_agent_info.minio_client', new_callable=MagicMock) as mock_minio_client:
+
+            mock_search_tools.return_value = [
+                {
+                    "class_name": "AnalyzeImageTool",
+                    "name": "analyze_image",
+                    "description": "Analyze image tool",
+                    "inputs": "string",
+                    "output_type": "string",
+                    "params": [{"name": "prompt", "default": "describe"}],
+                    "source": "local",
+                    "usage": None
+                }
+            ]
+            mock_get_vlm_model.return_value = "mock_vlm_model"
+
+            result = await create_tool_config_list("agent_1", "tenant_1", "user_1")
+
+            assert len(result) == 1
+            assert result[0] is mock_tool_instance
+            mock_get_vlm_model.assert_called_once_with(tenant_id="tenant_1")
+            assert mock_tool_instance.metadata == {
+                "vlm_model": "mock_vlm_model",
+                "storage_client": mock_minio_client
+            }
+
+    @pytest.mark.asyncio
     async def test_create_tool_config_list_with_analyze_text_file_tool(self):
         """Ensure AnalyzeTextFileTool receives text-specific metadata."""
         mock_tool_instance = MagicMock()
@@ -431,42 +437,6 @@ class TestCreateToolConfigList:
                 "llm_model": "mock_llm_model",
                 "storage_client": mock_minio_client,
                 "data_process_service_url": consts_const.DATA_PROCESS_SERVICE,
-            }
-
-    @pytest.mark.asyncio
-    async def test_create_tool_config_list_with_analyze_image_tool(self):
-        """Ensure AnalyzeImageTool receives VLM model metadata."""
-        mock_tool_instance = MagicMock()
-        mock_tool_instance.class_name = "AnalyzeImageTool"
-        mock_tool_config.return_value = mock_tool_instance
-
-        with patch('backend.agents.create_agent_info.discover_langchain_tools', return_value=[]), \
-                patch('backend.agents.create_agent_info.search_tools_for_sub_agent') as mock_search_tools, \
-                patch('backend.agents.create_agent_info.get_vlm_model') as mock_get_vlm_model, \
-                patch('backend.agents.create_agent_info.minio_client', new_callable=MagicMock) as mock_minio_client:
-
-            mock_search_tools.return_value = [
-                {
-                    "class_name": "AnalyzeImageTool",
-                    "name": "analyze_image",
-                    "description": "Analyze image tool",
-                    "inputs": "string",
-                    "output_type": "string",
-                    "params": [{"name": "prompt", "default": "describe"}],
-                    "source": "local",
-                    "usage": None
-                }
-            ]
-            mock_get_vlm_model.return_value = "mock_vlm_model"
-
-            result = await create_tool_config_list("agent_1", "tenant_1", "user_1")
-
-            assert len(result) == 1
-            assert result[0] is mock_tool_instance
-            mock_get_vlm_model.assert_called_once_with(tenant_id="tenant_1")
-            assert mock_tool_instance.metadata == {
-                "vlm_model": "mock_vlm_model",
-                "storage_client": mock_minio_client
             }
 
 
@@ -1278,16 +1248,13 @@ class TestJoinMinioFileDescriptionToQuery:
         minio_files = [
             {"url": "/nexent/1.pdf", "name": "1.pdf"},
             {"url": "/nexent/2.pdf", "name": "2.pdf"},
-            {"url": "/nexent/3.pdf", "name": "3.pdf"},
+            {"no_description": "should be ignored"}
         ]
         query = "test query"
 
         result = await join_minio_file_description_to_query(minio_files, query)
 
-        expected = ("User provided some reference files:\nFile S3 URL: s3://nexent/1.pdf, file name:1.pdf\n"
-                    "File S3 URL: s3://nexent/2.pdf, file name:2.pdf\n"
-                    "File S3 URL: s3://nexent/3.pdf, file name:3.pdf\n\n"
-                    'User wants to answer questions based on the above information: test query')
+        expected = "User provided some reference files:\nFile S3 URL: s3://nexent/1.pdf, file name:1.pdf\nFile S3 URL: s3://nexent/2.pdf, file name:2.pdf\n\nUser wants to answer questions based on the above information: test query"
         assert result == expected
 
     @pytest.mark.asyncio

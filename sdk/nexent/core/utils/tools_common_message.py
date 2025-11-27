@@ -11,7 +11,7 @@ class ToolSign(Enum):
     TAVILY_SEARCH = "d"  # Tavily search tool identifier
     FILE_OPERATION = "f"      # File operation tool identifier
     TERMINAL_OPERATION = "t"  # Terminal operation tool identifier
-    MULTIMODAL_OPERATION = "m"  # Multimodal operation tool identifier
+    MULTIMODAL_OPERATION = "m" # Multimodal operation tool identifier
 
 
 # Tool sign mapping for backward compatibility
