@@ -516,3 +516,11 @@ nexent智能体帮助我学到更多的东西，赞！
 ::: info SkyWalker - 2025-11-26
 第一次使用nexent，想借此更快入手ai应用开发呀！
 :::
+
+:::info user - 2025-11-26
+Nexent开发者加油
+:::
+
+:::info NOSN - 2025-11-27
+Nexent越做越强大！
+:::
