@@ -4,13 +4,12 @@ from typing import Dict, Any
 
 import yaml
 
-
-logger = logging.getLogger("prompt_template_utils")
-
 LANGUAGE = {
     "ZH": "zh",
     "EN": "en"
 }
+
+logger = logging.getLogger("prompt_template_utils")
 
 # Define template path mapping
 template_paths = {
@@ -27,14 +26,12 @@ template_paths = {
 def get_prompt_template(template_type: str, language: str = LANGUAGE["ZH"], **kwargs) -> Dict[str, Any]:
     """
     Get prompt template
-
     Args:
         template_type: Template type, supports the following values:
             - 'analyze_image': Analyze image template
             - 'analyze_file': Analyze file template (for text files)
         language: Language code ('zh' or 'en')
         **kwargs: Additional parameters, for agent type need to pass is_manager parameter
-
     Returns:
         dict: Loaded prompt template
     """
