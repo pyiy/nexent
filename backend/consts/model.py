@@ -341,6 +341,7 @@ class ExportAndImportDataFormat(BaseModel):
 
 class AgentImportRequest(BaseModel):
     agent_info: ExportAndImportDataFormat
+    force_import: bool = False
 
 
 class ConvertStateRequest(BaseModel):

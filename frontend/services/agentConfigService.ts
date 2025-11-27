@@ -451,13 +451,17 @@ export const exportAgent = async (agentId: number) => {
  * @param agentInfo agent configuration data
  * @returns import result
  */
-export const importAgent = async (agentInfo: any) => {
+export const importAgent = async (
+  agentInfo: any,
+  options?: { forceImport?: boolean }
+) => {
   try {
     const response = await fetch(API_ENDPOINTS.agent.import, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
         agent_info: agentInfo,
+        force_import: options?.forceImport ?? false,
       }),
     });
 

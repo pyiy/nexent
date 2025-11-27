@@ -134,7 +134,11 @@ async def import_agent_api(request: AgentImportRequest, authorization: Optional[
     import an agent
     """
     try:
-        await import_agent_impl(request.agent_info, authorization)
+        await import_agent_impl(
+            request.agent_info,
+            authorization,
+            force_import=request.force_import
+        )
         return {}
     except Exception as e:
         logger.error(f"Agent import error: {str(e)}")

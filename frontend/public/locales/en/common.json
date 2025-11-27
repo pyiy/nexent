@@ -749,6 +749,13 @@
   "businessLogic.config.message.agentDeleteSuccess": "Agent delete success",
   "businessLogic.config.message.agentDeleteFailed": "Agent delete failed",
   "businessLogic.config.message.agentSaveSuccess": "Agent save success",
+  "businessLogic.config.import.duplicateTitle": "Duplicate agent detected",
+  "businessLogic.config.import.duplicateDescription": "The imported agent name or display name conflicts with an existing agent. You can choose to import directly or call the LLM to regenerate a unique name before importing.",
+  "businessLogic.config.import.duplicateConfirm": "Regenerate and import",
+  "businessLogic.config.import.duplicateCancel": "Cancel import",
+  "businessLogic.config.import.forceButton": "Import anyway",
+  "businessLogic.config.import.forceWarning": "Direct import keeps the duplicate names. The imported agent remains unavailable until you manually update its name and display name.",
+  "businessLogic.config.import.regenerateTooltip": "Regenerate and import will call the LLM to rename the agent, which may take some time.",
 
   "login.expired.title": "Login Expired",
   "login.expired.content": "Your login session has expired. Please log in again to continue.",
