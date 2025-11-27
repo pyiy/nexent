@@ -904,6 +904,7 @@
   "agentConfig.agents.listFetchFailedDebug": "获取 Agent 列表失败:",
   "agentConfig.modals.saveConfirm.title": "未保存的更改",
   "agentConfig.modals.saveConfirm.content": "当前Agent有未保存的更改。是否现在保存？",
+  "agentConfig.modals.saveConfirm.invalidContent": "当前配置无法保存：{{invalidReason}}。请修改后重试。",
   "agentConfig.modals.saveConfirm.discard": "放弃更改",
   "agentConfig.modals.saveConfirm.save": "保存",
 

@@ -12,6 +12,8 @@ interface SaveConfirmModalProps {
   onSave: AsyncOrSyncHandler;
   onClose?: AsyncOrSyncHandler;
   width?: number;
+  canSave?: boolean;
+  invalidReason?: string;
 }
 
 export default function SaveConfirmModal({
@@ -20,6 +22,8 @@ export default function SaveConfirmModal({
   onSave,
   onClose,
   width = 520,
+  canSave = true,
+  invalidReason,
 }: SaveConfirmModalProps) {
   const { t } = useTranslation("common");
 
@@ -46,10 +50,14 @@ export default function SaveConfirmModal({
       centered
       footer={
         <div className="flex justify-end mt-4 gap-3">
-          <Button onClick={handleCancel}>{t("agentConfig.modals.saveConfirm.discard")}</Button>
-          <Button type="primary" onClick={handleSave}>
-            {t("agentConfig.modals.saveConfirm.save")}
+          <Button onClick={handleCancel}>
+            {t("agentConfig.modals.saveConfirm.discard")}
           </Button>
+          {canSave ? (
+            <Button type="primary" onClick={handleSave}>
+              {t("agentConfig.modals.saveConfirm.save")}
+            </Button>
+          ) : null}
         </div>
       }
       width={width}
@@ -61,9 +69,19 @@ export default function SaveConfirmModal({
             style={{ fontSize: "48px" }}
           />
           <div className="ml-3 mt-2">
-            <div className="text-sm leading-6">
-              {t("agentConfig.modals.saveConfirm.content")}
-            </div>
+            {canSave ? (
+              <div className="text-sm leading-6">
+                {t("agentConfig.modals.saveConfirm.content")}
+              </div>
+            ) : (
+              <div className="text-sm leading-6 flex flex-col gap-2">
+                <span>
+                  {t("agentConfig.modals.saveConfirm.invalidContent", {
+                    invalidReason,
+                  })}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

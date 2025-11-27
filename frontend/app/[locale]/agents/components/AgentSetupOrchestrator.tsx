@@ -500,7 +500,12 @@ export default function AgentSetupOrchestrator({
 
   const confirmOrRun = useCallback(
     (action: PendingAction) => {
-      if (hasUnsavedChanges) {
+      // In creation mode, always show save confirmation dialog when clicking debug
+      if (isCreatingNewAgent && !isEditingAgent) {
+        setPendingAction(() => action);
+        setConfirmContext("switch");
+        setIsSaveConfirmOpen(true);
+      } else if (hasUnsavedChanges) {
         setPendingAction(() => action);
         setConfirmContext("switch");
         setIsSaveConfirmOpen(true);
@@ -508,7 +513,7 @@ export default function AgentSetupOrchestrator({
         void Promise.resolve(action());
       }
     },
-    [hasUnsavedChanges]
+    [hasUnsavedChanges, isCreatingNewAgent, isEditingAgent]
   );
 
   const handleToolConfigDraftSave = useCallback(
@@ -905,6 +910,8 @@ export default function AgentSetupOrchestrator({
     setSelectedTools([]);
     setEnabledToolIds([]);
     setEnabledAgentIds([]);
+    setToolConfigDrafts({});
+    setMainAgentId?.(null);
 
     // Clear business logic model to allow default from global settings
     // The useEffect in PromptManager will set it to the default from localStorage
@@ -915,6 +922,12 @@ export default function AgentSetupOrchestrator({
     // The useEffect in AgentConfigModal will set it to the default from localStorage
     setMainAgentModel(null);
     setMainAgentModelId(null);
+
+    try {
+      await onToolsRefresh?.(false);
+    } catch (error) {
+      log.error("Failed to refresh tools in creation mode:", error);
+    }
 
     onEditingStateChange?.(false, null);
   };
@@ -1545,7 +1558,8 @@ export default function AgentSetupOrchestrator({
           message.success(
             translationFn("businessLogic.config.error.agentImportSuccess")
           );
-          await refreshAgentList(translationFn);
+          // Don't clear tools when importing to avoid triggering false unsaved changes indicator
+          await refreshAgentList(translationFn, false);
           return true;
         }
 
@@ -1745,9 +1759,26 @@ export default function AgentSetupOrchestrator({
             skipUnsavedCheckRef.current = false;
           }, 0);
           onEditingStateChange?.(false, null);
+        } else {
+          // If deleting another agent that is in enabledAgentIds, remove it and update baseline
+          // to avoid triggering false unsaved changes indicator
+          const deletedId = Number(agentToDelete.id);
+          if (enabledAgentIds.includes(deletedId)) {
+            const updatedEnabledAgentIds = enabledAgentIds.filter(
+              (id) => id !== deletedId
+            );
+            setEnabledAgentIds(updatedEnabledAgentIds);
+            // Update baseline to reflect this change so it doesn't trigger unsaved changes
+            if (baselineRef.current) {
+              baselineRef.current = {
+                ...baselineRef.current,
+                enabledAgentIds: updatedEnabledAgentIds.sort((a, b) => a - b),
+              };
+            }
+          }
         }
-        // Refresh agent list
-        refreshAgentList(t);
+        // Refresh agent list without clearing tools to avoid triggering false unsaved changes indicator
+        refreshAgentList(t, false);
       } else {
         message.error(
           result.message || t("businessLogic.config.error.agentDeleteFailed")
@@ -2144,6 +2175,10 @@ export default function AgentSetupOrchestrator({
             // Only close modal, don't execute discard logic
             setIsSaveConfirmOpen(false);
           }}
+          canSave={localCanSaveAgent}
+          invalidReason={
+            localCanSaveAgent ? undefined : getLocalButtonTitle() || undefined
+          }
         />
         {/* Duplicate import confirmation */}
         <Modal

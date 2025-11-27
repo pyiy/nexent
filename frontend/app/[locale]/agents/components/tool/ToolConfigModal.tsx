@@ -84,7 +84,7 @@ export default function ToolConfigModal({
         return;
       }
 
-      // In creation mode we do not have an agent ID yet, so use the tool's default params.
+      // In creation mode (no agent ID), always use backend-provided default params
       if (!normalizedAgentId) {
         setCurrentParams(buildDefaultParams());
         return;
@@ -92,6 +92,7 @@ export default function ToolConfigModal({
 
       setIsLoading(true);
       try {
+        // In edit mode, load tool config for the specific agent
         const result = await searchToolConfig(
           parseInt(tool.id),
           normalizedAgentId
