@@ -2,6 +2,8 @@
 
 Agent Space is the central dashboard for every agent you have built. View agents in card form, inspect their configurations, delete or export them, and jump straight into chats.
 
+![Agent Space](./assets/agent-space/agent-space.png)
+
 ## 📦 Agent Cards
 
 Each agent appears as a card showing:
@@ -23,6 +25,8 @@ Click a card to open its details:
 - **Prompts:** Role, constraints, examples, and the original description.
 - **Tools:** Every tool the agent can use.
 - **Sub-agents:** Any collaborative agents that are configured.
+
+![Agent Details](./assets/agent-space/agent-details.png)
 
 ### Edit an Agent
 

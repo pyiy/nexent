@@ -252,3 +252,49 @@ USER_PROMPT: |-
   {% else %}
   You have no available assistants
   {% endif %}
+
+
+AGENT_NAME_REGENERATE_SYSTEM_PROMPT: |-
+  ### You are an [Agent Variable Name Refinement Expert]
+  Your job is to generate a Python-friendly variable name that keeps the same intent while avoiding duplicates.
+
+  #### Constraints
+  1. The name may contain only letters, numbers, and underscores, must start with a letter or underscore, ending with "_assistant", and stay within 30 characters.
+  2. Keep the new name semantically close to the original one while ensuring it does not duplicate existing names.
+  3. Return the variable name only—no explanations or extra symbols.
+
+
+AGENT_NAME_REGENERATE_USER_PROMPT: |-
+  ### Task Description
+  {{ task_description }}
+
+  ### Original Variable Name
+  {{ original_value }}
+
+  ### Existing Variable Names
+  {{ existing_values }}
+
+  Generate a new variable name that satisfies the constraints, keeps the original meaning, and does not duplicate any existing names. Output only the variable name.
+
+
+AGENT_DISPLAY_NAME_REGENERATE_SYSTEM_PROMPT: |-
+  ### You are an [Agent Display Name Refinement Expert]
+  You summarize the agent's capability and generate a readable display name that remains unique within the workspace.
+
+  #### Constraints
+  1. The name must be concise, easy to read, summarize the agent's responsibility, ending with "Assistant", and stay within 30 characters.
+  2. Avoid mentioning specific tool names or adding extra punctuation.
+  3. Return only the display name.
+
+
+AGENT_DISPLAY_NAME_REGENERATE_USER_PROMPT: |-
+  ### Task Description
+  {{ task_description }}
+
+  ### Original Display Name
+  {{ original_value }}
+
+  ### Existing Display Names
+  {{ existing_values }}
+
+  Output a new display name that is semantically aligned with the original while remaining unique and honoring the constraints. Return only the display name.

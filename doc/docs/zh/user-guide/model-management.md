@@ -17,8 +17,8 @@
 - **上传自定义图片**：支持PNG、JPG图片格式，文件大小不超过2MB。
 
 <div style="display: flex; gap: 8px;">
-  <img src="./assets/app/predefined-app-icon-setting.png" style="width: 50%; height: 100%;" />
-  <img src="./assets/app/customized-app-icon-setting.png" style="width: 50%; height: 80%;" />
+  <img src="./assets/model-management/predefined-app-icon-setting.png" style="width: 50%; height: 100%;" />
+  <img src="./assets/model-management/customized-app-icon-setting.png" style="width: 50%; height: 80%;" />
 </div>
 
 ### 应用名称及描述配置
@@ -34,20 +34,18 @@
 - 建议突出应用核心功能，完整流畅且简洁明了。
 
 <div style="display: flex; justify-content: left;">
-  <img src="./assets/app/app-name-description-setting.png" style="width: 50%; height: auto;" />
+  <img src="./assets/model-management/app-name-description-setting.png" style="width: 50%; height: auto;" />
 </div>
 
 ## 🤖 模型配置
 
-## 🔄 同步ModelEngine模型
+### 🔄 同步ModelEngine模型
 
 Nexent即将支持与ModelEngine平台的无缝对接，届时可自动同步并使用您在ModelEngine上部署的所有模型，敬请期待！
 
-## 🛠️ 添加自定义模型
+### 🛠️ 添加自定义模型
 
-### 添加单个模型
-
-#### 添加单个模型步骤
+#### 添加单个模型
 
 1. **添加自定义模型**
    - 点击"添加自定义模型"按钮，进入添加模型弹窗。
@@ -70,10 +68,10 @@ Nexent即将支持与ModelEngine平台的无缝对接，届时可自动同步并
    - 配置完成后，点击"确定"按钮，模型将被添加到可用模型列表中。
 
 <div style="display: flex; justify-content: left;">
-  <img src="./assets/model/add-model.png" style="width: 50%; height: auto;" />
+  <img src="./assets/model-management/add-model.png" style="width: 50%; height: auto;" />
 </div>
 
-### 批量添加模型
+#### 批量添加模型
 
 为了提升模型导入效率，Nexent提供了批量模型导入功能。
 
@@ -93,39 +91,39 @@ Nexent即将支持与ModelEngine平台的无缝对接，届时可自动同步并
    - 配置完成后，点击"确定"按钮，所有选中的模型将被添加到可用模型列表中。
 
 <div style="display: flex; justify-content: left;">
-  <img src="./assets/model/add-model-batch.png" style="width: 50%; height: auto;" />
+  <img src="./assets/model-management/add-model-batch.png" style="width: 50%; height: auto;" />
 </div>
 
-## 🔧 修改自定义模型
+### 🔧 修改自定义模型
 
 当您需要修改模型配置或删除不再使用的模型时，可以通过以下步骤进行操作：
 
 1. 点击"修改自定义模型"按钮。
 2. 选择要修改或删除的模型类型（大语言模型/向量化模型/视觉语言模型）。
-3. 选择是批量修改模型，还是修改单例自定义模型。
-4. 如果批量修改模型，可以通过启动或关闭模型开关，添加或删除模型。您可以通过点击右上角的"修改配置"按钮，对选中的模型进行批量的配置修改。
-5. 如果是修改单例自定义模型，点击删除按钮 🗑️ ，即可删除目标模型；想要修改相关配置，点击模型名称，即可弹出修改弹窗进行修改。
+3. 选择是批量修改模型，还是修改单个自定义模型。
+4. 如果批量修改模型，可以通过启动或关闭模型开关来添加或删除模型。您也可以通过点击右上角的"修改配置"按钮，对选中的模型进行批量配置修改。
+5. 如果是修改单个自定义模型，点击删除按钮 🗑️ 即可删除目标模型；想要修改相关配置，点击模型名称即可弹出修改弹窗进行修改。
 
 <div style="display: flex; gap: 8px;">
-  <img src="./assets/model/edit-model-1.png" style="width: 50%; height: 100%;" />
-  <img src="./assets/model/edit-model-2.png" style="width: 50%; height: 80%;" />
+  <img src="./assets/model-management/edit-model-1.png" style="width: 50%; height: 100%;" />
+  <img src="./assets/model-management/edit-model-2.png" style="width: 50%; height: 80%;" />
 </div>
 <br>
 <div style="display: flex; gap: 8px;">
-  <img src="./assets/model/edit-model-3.png" style="width: 50%; height: 100%;" />
-  <img src="./assets/model/edit-model-4.png" style="width: 50%; height: 80%;" />
+  <img src="./assets/model-management/edit-model-3.png" style="width: 50%; height: 100%;" />
+  <img src="./assets/model-management/edit-model-4.png" style="width: 50%; height: 80%;" />
 </div>
 <br>
 <div style="display: flex; gap: 8px;">
-  <img src="./assets/model/edit-model-5.png" style="width: 50%; height: 100%;" />
-  <img src="./assets/model/edit-model-6.png" style="width: 50%; height: 80%;" />
+  <img src="./assets/model-management/edit-model-5.png" style="width: 50%; height: 100%;" />
+  <img src="./assets/model-management/edit-model-6.png" style="width: 50%; height: 80%;" />
 </div>
 
-## ⚙️ 配置系统模型
+### ⚙️ 配置系统模型
 
 添加模型后，您需要配置系统基础模型，该模型将用于标题生成、实时文件读取等基础功能。在智能体运行时，您可以为每个智能体指定特定的运行模型。
 
-### 基础模型配置
+#### 基础模型配置
 
 系统基础模型用于处理平台的核心功能，包括：
 
@@ -137,25 +135,25 @@ Nexent即将支持与ModelEngine平台的无缝对接，届时可自动同步并
 
 - 点击基础模型下拉框，从已添加的大语言模型中选择一个作为系统基础模型。
 
-### 向量化模型
+#### 向量化模型
 
 向量化模型主要用于知识库的文本、图片等数据的向量化处理，是实现高效检索和语义理解的基础。配置合适的向量化模型，可以显著提升知识库的搜索准确率和多模态数据的处理能力。
 
 - 点击向量模型下拉框，从已添加的向量化模型中选择一个。
 
-### 多模态模型
+#### 多模态模型
 
 多模态模型结合了视觉和语言能力，能够处理包含文本、图片等多种信息的复杂场景。例如，在对话页面上传图片文件时，系统会自动调用多模态模型进行内容解析和智能对话。
 
 - 点击视觉语言模型下拉框，从已添加的视觉语言模型中选择一个。
 
 <div style="display: flex; gap: 8px;">
-  <img src="./assets/model/select-model-1.png" style="width: 30%; height: 100%;" />
-  <img src="./assets/model/select-model-2.png" style="width: 30%; height: 100%;" />
-  <img src="./assets/model/select-model-3.png" style="width: 30%; height: 100%;" />
+  <img src="./assets/model-management/select-model-1.png" style="width: 30%; height: 100%;" />
+  <img src="./assets/model-management/select-model-2.png" style="width: 30%; height: 100%;" />
+  <img src="./assets/model-management/select-model-3.png" style="width: 30%; height: 100%;" />
 </div>
 
-## ✅ 检查模型连通性
+### ✅ 检查模型连通性
 
 定期检查模型连通性是确保系统稳定运行的重要环节。通过连通性检查功能，您可以及时发现和解决模型连接问题，保证服务的连续性和可靠性。
 
@@ -177,9 +175,9 @@ Nexent即将支持与ModelEngine平台的无缝对接，届时可自动同步并
 - 确认模型服务商的服务状态
 - 检查防火墙和安全策略设置
 
-## 🤖 支持的模型提供商
+### 🤖 支持的模型提供商
 
-### 🤖 大语言模型LLM
+#### 🤖 大语言模型LLM
 
 Nexent 支持任何 **遵循OpenAI API规范** 的大语言模型供应商，包括：
 
@@ -198,15 +196,15 @@ Nexent 支持任何 **遵循OpenAI API规范** 的大语言模型供应商，包
 3. 在文档中查看API端点（即模型URL，一般以`/v1`为结尾）；
 4. 在Nexent模型配置页面点击添加自定义模型，填入必备信息，即可接入。
 
-### 🎭 多模态视觉模型
+#### 🎭 多模态视觉模型
 
 使用与大语言模型相同的API Key和模型URL，但指定多模态模型名称，如硅基流动提供的**Qwen/Qwen2.5-VL-32B-Instruct**。
 
-### 🔤 向量模型
+#### 🔤 向量模型
 
 使用与大语言模型相同的API Key，但模型URL一般会有所差异，一般以`/v1/embeddings`为结尾，同时指定向量模型名称，如硅基流动提供的**BAAI/bge-m3**。
 
-### 🎤 语音模型
+#### 🎤 语音模型
 
 目前仅支持火山引擎语音，且需要在`.env`中进行配置
 

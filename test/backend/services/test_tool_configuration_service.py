@@ -1824,6 +1824,77 @@ class TestValidateLocalToolKnowledgeBaseSearch:
             )
 
 
+class TestValidateLocalToolAnalyzeImage:
+    """Test cases for _validate_local_tool with analyze_image tool."""
+
+    @patch('backend.services.tool_configuration_service.minio_client')
+    @patch('backend.services.tool_configuration_service.get_vlm_model')
+    @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
+    @patch('backend.services.tool_configuration_service.inspect.signature')
+    def test_validate_local_tool_analyze_image_success(self, mock_signature, mock_get_class, mock_get_vlm_model, mock_minio_client):
+        mock_tool_class = Mock()
+        mock_tool_instance = Mock()
+        mock_tool_instance.forward.return_value = "analyze image result"
+        mock_tool_class.return_value = mock_tool_instance
+        mock_get_class.return_value = mock_tool_class
+        mock_get_vlm_model.return_value = "mock_vlm_model"
+
+        mock_sig = Mock()
+        mock_sig.parameters = {}
+        mock_signature.return_value = mock_sig
+
+        from backend.services.tool_configuration_service import _validate_local_tool
+
+        result = _validate_local_tool(
+            "analyze_image",
+            {"image": "bytes"},
+            {"prompt": "describe"},
+            "tenant1",
+            "user1"
+        )
+
+        assert result == "analyze image result"
+        mock_get_vlm_model.assert_called_once_with(tenant_id="tenant1")
+        mock_tool_class.assert_called_once_with(
+            prompt="describe",
+            vlm_model="mock_vlm_model",
+            storage_client=mock_minio_client
+        )
+        mock_tool_instance.forward.assert_called_once_with(image="bytes")
+
+    @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
+    def test_validate_local_tool_analyze_image_missing_tenant(self, mock_get_class):
+        mock_get_class.return_value = Mock()
+
+        from backend.services.tool_configuration_service import _validate_local_tool
+
+        with pytest.raises(ToolExecutionException,
+                           match="Tenant ID and User ID are required for analyze_image validation"):
+            _validate_local_tool(
+                "analyze_image",
+                {"image": "bytes"},
+                {"prompt": "describe"},
+                None,
+                "user1"
+            )
+
+    @patch('backend.services.tool_configuration_service._get_tool_class_by_name')
+    def test_validate_local_tool_analyze_image_missing_user(self, mock_get_class):
+        mock_get_class.return_value = Mock()
+
+        from backend.services.tool_configuration_service import _validate_local_tool
+
+        with pytest.raises(ToolExecutionException,
+                           match="Tenant ID and User ID are required for analyze_image validation"):
+            _validate_local_tool(
+                "analyze_image",
+                {"image": "bytes"},
+                {"prompt": "describe"},
+                "tenant1",
+                None
+            )
+
+
 class TestValidateLocalToolAnalyzeTextFile:
     """Test cases for _validate_local_tool function with analyze_text_file tool"""
 

@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { Plus, RefreshCw, Upload } from "lucide-react";
 import { USER_ROLES } from "@/const/modelConfig";
 import { useAuth } from "@/hooks/useAuth";
+import { useSetupFlow } from "@/hooks/useSetupFlow";
 import AgentCard from "./AgentCard";
 
 interface Agent {
@@ -45,6 +46,9 @@ export function SpaceContent({
   const router = useRouter();
   const { t } = useTranslation("common");
   const { user, isSpeedMode } = useAuth();
+  const { canAccessProtectedData, pageVariants, pageTransition } = useSetupFlow({
+    requireAdmin: false,
+  });
 
   // Check if user is admin (or in speed mode where all features are available)
   const isAdmin = isSpeedMode || user?.role === USER_ROLES.ADMIN;
@@ -66,8 +70,19 @@ export function SpaceContent({
     }
   };
 
+  if (!canAccessProtectedData) {
+    return null;
+  }
+
   return (
-    <div className="w-full px-4 md:px-8 lg:px-16 py-8">
+    <motion.div
+      initial="initial"
+      animate="in"
+      exit="out"
+      variants={pageVariants}
+      transition={pageTransition}
+      className="w-full px-4 md:px-8 lg:px-16 py-8"
+    >
       <div className="max-w-7xl mx-auto">
         {/* Page header */}
         <div className="flex items-center justify-between mb-6">
@@ -190,7 +205,7 @@ export function SpaceContent({
           </motion.div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
 

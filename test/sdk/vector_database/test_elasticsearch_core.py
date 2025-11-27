@@ -573,6 +573,207 @@ def test_delete_documents_success(elasticsearch_core_instance):
         mock_delete.assert_called_once()
 
 
+def test_create_chunk_success(elasticsearch_core_instance):
+    """Test creating a single chunk document."""
+    elasticsearch_core_instance.client = MagicMock()
+    elasticsearch_core_instance.client.index.return_value = {
+        "_id": "es-id-1",
+        "result": "created",
+        "_version": 1,
+    }
+
+    payload = {"id": "chunk-1", "content": "A"}
+    result = elasticsearch_core_instance.create_chunk("kb-index", payload)
+
+    assert result["id"] == "es-id-1"
+    assert result["result"] == "created"
+    elasticsearch_core_instance.client.index.assert_called_once()
+
+
+def test_update_chunk_success(elasticsearch_core_instance):
+    """Test updating an existing chunk document."""
+    elasticsearch_core_instance.client = MagicMock()
+    with patch.object(
+        elasticsearch_core_instance,
+        "_resolve_chunk_document_id",
+        return_value="es-id-1",
+    ):
+        elasticsearch_core_instance.client.update.return_value = {
+            "_id": "es-id-1",
+            "result": "updated",
+            "_version": 2,
+        }
+
+        updates = {"content": "updated"}
+        result = elasticsearch_core_instance.update_chunk(
+            "kb-index", "chunk-1", updates
+        )
+
+        assert result["id"] == "es-id-1"
+        assert result["result"] == "updated"
+        elasticsearch_core_instance.client.update.assert_called_once()
+
+
+def test_delete_chunk_success(elasticsearch_core_instance):
+    """Test deleting a chunk document successfully."""
+    elasticsearch_core_instance.client = MagicMock()
+    with patch.object(
+        elasticsearch_core_instance,
+        "_resolve_chunk_document_id",
+        return_value="es-id-1",
+    ):
+        elasticsearch_core_instance.client.delete.return_value = {
+            "result": "deleted"
+        }
+
+        result = elasticsearch_core_instance.delete_chunk("kb-index", "chunk-1")
+
+        assert result is True
+        elasticsearch_core_instance.client.delete.assert_called_once()
+
+
+def test_delete_chunk_not_found(elasticsearch_core_instance):
+    """Test deleting a missing chunk returns False."""
+    elasticsearch_core_instance.client = MagicMock()
+    with patch.object(
+        elasticsearch_core_instance,
+        "_resolve_chunk_document_id",
+        side_effect=exceptions.NotFoundError(404, "not found", {}),
+    ):
+        result = elasticsearch_core_instance.delete_chunk("kb-index", "missing")
+
+        assert result is False
+
+
+def test_create_chunk_exception(elasticsearch_core_instance):
+    """Test create_chunk raises exception when client.index fails."""
+    elasticsearch_core_instance.client = MagicMock()
+    elasticsearch_core_instance.client.index.side_effect = Exception("Index operation failed")
+    
+    payload = {"id": "chunk-1", "content": "A"}
+    
+    with pytest.raises(Exception) as exc_info:
+        elasticsearch_core_instance.create_chunk("kb-index", payload)
+    
+    assert "Index operation failed" in str(exc_info.value)
+    elasticsearch_core_instance.client.index.assert_called_once()
+
+
+def test_update_chunk_exception_from_resolve(elasticsearch_core_instance):
+    """Test update_chunk raises exception when _resolve_chunk_document_id fails."""
+    elasticsearch_core_instance.client = MagicMock()
+    with patch.object(
+        elasticsearch_core_instance,
+        "_resolve_chunk_document_id",
+        side_effect=Exception("Resolve failed"),
+    ):
+        updates = {"content": "updated"}
+        
+        with pytest.raises(Exception) as exc_info:
+            elasticsearch_core_instance.update_chunk("kb-index", "chunk-1", updates)
+        
+        assert "Resolve failed" in str(exc_info.value)
+        elasticsearch_core_instance.client.update.assert_not_called()
+
+
+def test_update_chunk_exception_from_update(elasticsearch_core_instance):
+    """Test update_chunk raises exception when client.update fails."""
+    elasticsearch_core_instance.client = MagicMock()
+    with patch.object(
+        elasticsearch_core_instance,
+        "_resolve_chunk_document_id",
+        return_value="es-id-1",
+    ):
+        elasticsearch_core_instance.client.update.side_effect = Exception("Update operation failed")
+        
+        updates = {"content": "updated"}
+        
+        with pytest.raises(Exception) as exc_info:
+            elasticsearch_core_instance.update_chunk("kb-index", "chunk-1", updates)
+        
+        assert "Update operation failed" in str(exc_info.value)
+        elasticsearch_core_instance.client.update.assert_called_once()
+
+
+def test_delete_chunk_exception_from_resolve(elasticsearch_core_instance):
+    """Test delete_chunk raises exception when _resolve_chunk_document_id fails with non-NotFoundError."""
+    elasticsearch_core_instance.client = MagicMock()
+    with patch.object(
+        elasticsearch_core_instance,
+        "_resolve_chunk_document_id",
+        side_effect=Exception("Resolve failed"),
+    ):
+        with pytest.raises(Exception) as exc_info:
+            elasticsearch_core_instance.delete_chunk("kb-index", "chunk-1")
+        
+        assert "Resolve failed" in str(exc_info.value)
+        elasticsearch_core_instance.client.delete.assert_not_called()
+
+
+def test_delete_chunk_exception_from_delete(elasticsearch_core_instance):
+    """Test delete_chunk raises exception when client.delete fails with non-NotFoundError."""
+    elasticsearch_core_instance.client = MagicMock()
+    with patch.object(
+        elasticsearch_core_instance,
+        "_resolve_chunk_document_id",
+        return_value="es-id-1",
+    ):
+        elasticsearch_core_instance.client.delete.side_effect = Exception("Delete operation failed")
+        
+        with pytest.raises(Exception) as exc_info:
+            elasticsearch_core_instance.delete_chunk("kb-index", "chunk-1")
+        
+        assert "Delete operation failed" in str(exc_info.value)
+        elasticsearch_core_instance.client.delete.assert_called_once()
+
+
+def test_resolve_chunk_document_id_direct_hit(elasticsearch_core_instance):
+    """Test _resolve_chunk_document_id returns given id when ES _id exists."""
+    elasticsearch_core_instance.client = MagicMock()
+    elasticsearch_core_instance.client.get.return_value = {}
+
+    doc_id = elasticsearch_core_instance._resolve_chunk_document_id(
+        "kb-index", "chunk-1"
+    )
+
+    assert doc_id == "chunk-1"
+    elasticsearch_core_instance.client.search.assert_not_called()
+
+
+def test_resolve_chunk_document_id_via_search(elasticsearch_core_instance):
+    """Test _resolve_chunk_document_id falls back to searching by stored id."""
+    elasticsearch_core_instance.client = MagicMock()
+    elasticsearch_core_instance.client.get.side_effect = exceptions.NotFoundError(
+        404, "not found", {}
+    )
+    elasticsearch_core_instance.client.search.return_value = {
+        "hits": {"hits": [{"_id": "es-id-1"}]}
+    }
+
+    doc_id = elasticsearch_core_instance._resolve_chunk_document_id(
+        "kb-index", "chunk-1"
+    )
+
+    assert doc_id == "es-id-1"
+    elasticsearch_core_instance.client.search.assert_called_once()
+
+
+def test_resolve_chunk_document_id_not_found(elasticsearch_core_instance):
+    """Test _resolve_chunk_document_id raises when no matching document is found."""
+    elasticsearch_core_instance.client = MagicMock()
+    elasticsearch_core_instance.client.get.side_effect = exceptions.NotFoundError(
+        404, "not found", {}
+    )
+    elasticsearch_core_instance.client.search.return_value = {
+        "hits": {"hits": []}
+    }
+
+    with pytest.raises(exceptions.NotFoundError):
+        elasticsearch_core_instance._resolve_chunk_document_id(
+            "kb-index", "missing"
+        )
+
+
 def test_get_index_chunks_success(elasticsearch_core_instance):
     """Test fetching chunks via scroll API."""
     elasticsearch_core_instance.client = MagicMock()

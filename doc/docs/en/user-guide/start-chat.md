@@ -19,7 +19,7 @@ Before starting a chat, you need to select an agent.
    - You can start a new chat after switching
 
 <div style="display: flex; justify-content: center;">
-  <img src="./assets/chat/agent-selection.png" style="width: 80%; height: auto;" alt="Select Agent" />
+  <img src="./assets/start-chat/agent-selection.png" style="width: 80%; height: auto;" alt="Select Agent" />
 </div>
 
 ### Send Text Messages
@@ -40,7 +40,7 @@ After selecting an agent, you can send text messages in the following ways:
    - The reasoning process will be shown as cards for easy distinction
 
 <div style="display: flex; justify-content: center;">
-  <img src="./assets/chat/dialog-box.png" style="width: 80%; height: auto;" alt="Select Agent" />
+  <img src="./assets/start-chat/dialog-box.png" style="width: 80%; height: auto;" alt="Select Agent" />
 </div>
 
 ### Use Voice Input
@@ -117,8 +117,8 @@ The left sidebar provides complete chat history management:
 > 💡 **Tip:** Regularly cleaning up unnecessary chat records keeps the interface tidy and improves search efficiency.
 
 <div style="display: flex; justify-content: space-between;">
-  <img src="./assets/chat/chat-management-1.png" style="width: 48%; height: auto;" alt="Chat Edit" />
-  <img src="./assets/chat/chat-management-2.png" style="width: 48%; height: auto;" alt="Chat Edit" />
+  <img src="./assets/start-chat/chat-management-1.png" style="width: 48%; height: auto;" alt="Chat Edit" />
+  <img src="./assets/start-chat/chat-management-2.png" style="width: 48%; height: auto;" alt="Chat Edit" />
 </div>
 
 ### Access Other Modules
@@ -154,8 +154,8 @@ The right sidebar provides two tabs: "Source" and "Images" to help you understan
 - Helps you visually understand relevant information
 
 <div style="display: flex; justify-content: space-between;">
-  <img src="./assets/chat/reference-source.png" style="width: 48%; height: auto;" alt="Reference Source" />
-  <img src="./assets/chat/reference-image.png" style="width: 48%; height: auto;" alt="Reference Image" />
+  <img src="./assets/start-chat/reference-source.png" style="width: 48%; height: auto;" alt="Reference Source" />
+  <img src="./assets/start-chat/reference-image.png" style="width: 48%; height: auto;" alt="Reference Image" />
 </div>
 
 ## 🎭 Multimodal Interaction Experience

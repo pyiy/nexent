@@ -152,8 +152,13 @@ mock_nexent_core_utils_module.observer = mock_nexent_core_utils_observer_module
 mock_nexent_core_utils_module.prompt_template_utils = mock_prompt_template_utils_module
 mock_nexent_core_utils_module.tools_common_message = mock_tools_common_message_module
 
+mock_nexent_core_models_module = types.ModuleType("nexent.core.models")
+mock_nexent_core_models_module.OpenAILongContextModel = MagicMock()
+mock_nexent_core_models_module.OpenAIVLModel = MagicMock()
+
 mock_nexent_core_module = types.ModuleType("nexent.core")
 mock_nexent_core_module.utils = mock_nexent_core_utils_module
+mock_nexent_core_module.models = mock_nexent_core_models_module
 mock_nexent_core_module.MessageObserver = _MockMessageObserver
 mock_nexent_module = types.ModuleType("nexent")
 mock_nexent_module.core = mock_nexent_core_module
@@ -205,6 +210,7 @@ module_mocks = {
     "nexent.core.utils.observer": mock_nexent_core_utils_observer_module,
     "nexent.core.utils.prompt_template_utils": mock_prompt_template_utils_module,
     "nexent.core.utils.tools_common_message": mock_tools_common_message_module,
+    "nexent.core.models": mock_nexent_core_models_module,
     "nexent.storage": mock_nexent_storage_module,
     "nexent.multi_modal": mock_nexent_multi_modal_module,
     "nexent.multi_modal.load_save_object": mock_nexent_load_save_module,
@@ -845,6 +851,86 @@ def test_create_local_tool_analyze_text_file_tool(nexent_agent_instance):
         llm_model="llm_model_obj",
         storage_client="storage_client_obj",
         data_process_service_url="DATA_PROCESS_SERVICE",
+        prompt="describe this",
+    )
+    assert result == mock_analyze_tool_instance
+
+
+def test_create_local_tool_analyze_image_tool(nexent_agent_instance):
+    """Test AnalyzeImageTool creation injects observer and metadata."""
+    mock_analyze_tool_class = MagicMock()
+    mock_analyze_tool_instance = MagicMock()
+    mock_analyze_tool_class.return_value = mock_analyze_tool_instance
+
+    tool_config = ToolConfig(
+        class_name="AnalyzeImageTool",
+        name="analyze_image",
+        description="desc",
+        inputs="{}",
+        output_type="string",
+        params={"prompt": "describe this"},
+        source="local",
+        metadata={
+            "vlm_model": "vlm_model_obj",
+            "storage_client": "storage_client_obj",
+        },
+    )
+
+    original_value = nexent_agent.__dict__.get("AnalyzeImageTool")
+    nexent_agent.__dict__["AnalyzeImageTool"] = mock_analyze_tool_class
+
+    try:
+        result = nexent_agent_instance.create_local_tool(tool_config)
+    finally:
+        if original_value is not None:
+            nexent_agent.__dict__["AnalyzeImageTool"] = original_value
+        elif "AnalyzeImageTool" in nexent_agent.__dict__:
+            del nexent_agent.__dict__["AnalyzeImageTool"]
+
+    mock_analyze_tool_class.assert_called_once_with(
+        observer=nexent_agent_instance.observer,
+        vlm_model="vlm_model_obj",
+        storage_client="storage_client_obj",
+        prompt="describe this",
+    )
+    assert result == mock_analyze_tool_instance
+
+
+def test_create_local_tool_analyze_image_tool(nexent_agent_instance):
+    """Test AnalyzeImageTool creation injects observer and metadata."""
+    mock_analyze_tool_class = MagicMock()
+    mock_analyze_tool_instance = MagicMock()
+    mock_analyze_tool_class.return_value = mock_analyze_tool_instance
+
+    tool_config = ToolConfig(
+        class_name="AnalyzeImageTool",
+        name="analyze_image",
+        description="desc",
+        inputs="{}",
+        output_type="string",
+        params={"prompt": "describe this"},
+        source="local",
+        metadata={
+            "vlm_model": "vlm_model_obj",
+            "storage_client": "storage_client_obj",
+        },
+    )
+
+    original_value = nexent_agent.__dict__.get("AnalyzeImageTool")
+    nexent_agent.__dict__["AnalyzeImageTool"] = mock_analyze_tool_class
+
+    try:
+        result = nexent_agent_instance.create_local_tool(tool_config)
+    finally:
+        if original_value is not None:
+            nexent_agent.__dict__["AnalyzeImageTool"] = original_value
+        elif "AnalyzeImageTool" in nexent_agent.__dict__:
+            del nexent_agent.__dict__["AnalyzeImageTool"]
+
+    mock_analyze_tool_class.assert_called_once_with(
+        observer=nexent_agent_instance.observer,
+        vlm_model="vlm_model_obj",
+        storage_client="storage_client_obj",
         prompt="describe this",
     )
     assert result == mock_analyze_tool_instance

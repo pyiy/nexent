@@ -439,11 +439,13 @@ const DocumentListContainer = forwardRef<DocumentListRef, DocumentListProps>(
           }}
         >
           {showChunk ? (
-            <div className="flex h-full flex-col px-8 py-4">
+            <div className="flex h-full flex-col px-8">
               <DocumentChunk
                 knowledgeBaseName={knowledgeBaseName}
                 documents={documents}
                 getFileIcon={getFileIcon}
+                currentEmbeddingModel={currentModel}
+                knowledgeBaseEmbeddingModel={knowledgeBaseModel}
               />
             </div>
           ) : showDetail ? (

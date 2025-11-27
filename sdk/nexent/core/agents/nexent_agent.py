@@ -89,6 +89,11 @@ class NexentAgent:
                                        storage_client=tool_config.metadata.get("storage_client", []),
                                        data_process_service_url=tool_config.metadata.get("data_process_service_url", []),
                                        **params)
+            elif class_name == "AnalyzeImageTool":
+                tools_obj = tool_class(observer=self.observer,
+                                       vlm_model=tool_config.metadata.get("vlm_model", []),
+                                       storage_client=tool_config.metadata.get("storage_client", []),
+                                       **params)
             else:
                 tools_obj = tool_class(**params)
                 if hasattr(tools_obj, 'observer'):
