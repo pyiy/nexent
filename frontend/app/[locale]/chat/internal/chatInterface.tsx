@@ -451,217 +451,22 @@ export function ChatInterface() {
         ],
       }));
 
-      // If there are attachment files, preprocess first
+      // If there are attachment files, skip preprocessing (no API call, no UI prompts)
       let finalQuery = userMessage.content;
       // Declare a variable to save file description information
       let fileDescriptionsMap: Record<string, string> = {};
 
       if (attachments.length > 0) {
-        // Attachment preprocessing step, as independent step in assistant steps
-        setSessionMessages((prev) => ({
-          ...prev,
-          [currentConversationId]: [
-            ...(prev[currentConversationId] || []),
-            {
-              id: uuidv4(),
-              role: ROLE_ASSISTANT,
-              content: "",
-              timestamp: new Date(),
-              isComplete: false,
-              steps: [
-                {
-                  id: `preprocess-${Date.now()}`,
-                  title: t("chatInterface.filePreprocessing"),
-                  content: "",
-                  expanded: true,
-                  metrics: "",
-                  thinking: { content: "", expanded: false },
-                  code: { content: "", expanded: false },
-                  output: { content: "", expanded: false },
-                  contents: [
-                    {
-                      id: `preprocess-content-${Date.now()}`,
-                      type: chatConfig.contentTypes.PREPROCESS,
-                      content: t("chatInterface.parsingFile"),
-                      expanded: false,
-                      timestamp: Date.now(),
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        }));
-
-        // Buffer for truncation messages with deduplication
-        const truncationBuffer: any[] = [];
-        const processedTruncationIds = new Set<string>(); // Track processed truncation messages to avoid duplicates
-
-        // Use extracted preprocessing function to process attachments
+        // Skip preprocessing - directly use original content
+        // No preprocessing UI will be shown
         const result = await preprocessAttachments(
           userMessage.content,
           attachments,
           currentController.signal,
-          (jsonData) => {
-            setSessionMessages((prev) => {
-              const newMessages = { ...prev };
-              const lastMsg =
-                newMessages[currentConversationId]?.[
-                  newMessages[currentConversationId].length - 1
-                ];
-              if (lastMsg && lastMsg.role === ROLE_ASSISTANT) {
-                if (!lastMsg.steps) lastMsg.steps = [];
-                // Find the latest preprocessing step
-                let step = lastMsg.steps.find(
-                  (s) => s.title === t("chatInterface.filePreprocessing")
-                );
-                if (!step) {
-                  step = {
-                    id: `preprocess-${Date.now()}`,
-                    title: t("chatInterface.filePreprocessing"),
-                    content: "",
-                    expanded: true,
-                    metrics: "",
-                    thinking: { content: "", expanded: false },
-                    code: { content: "", expanded: false },
-                    output: { content: "", expanded: false },
-                    contents: [
-                      {
-                        id: `preprocess-content-${Date.now()}`,
-                        type: chatConfig.contentTypes.PREPROCESS,
-                        content: t("chatInterface.parsingFile"),
-                        expanded: false,
-                        timestamp: Date.now(),
-                      },
-                    ],
-                  };
-                  lastMsg.steps.push(step);
-                }
-
-                // Handle truncation messages - buffer them instead of updating immediately
-                if (jsonData.type === "truncation") {
-                  // Create a unique ID for this truncation message to avoid duplicates
-                  const truncationId = `${jsonData.filename || "unknown"}_${
-                    jsonData.message || ""
-                  }`;
-
-                  // Only add if not already processed
-                  if (!processedTruncationIds.has(truncationId)) {
-                    truncationBuffer.push(jsonData);
-                    processedTruncationIds.add(truncationId);
-                  }
-                  return newMessages; // Don't update stepContent for truncation
-                }
-
-                let stepContent = "";
-                switch (jsonData.type) {
-                  case "progress":
-                    if (jsonData.message_data) {
-                      const i18nKey = getI18nKeyByType(jsonData.type);
-                      stepContent = String(
-                        t(i18nKey, jsonData.message_data.params)
-                      );
-                    } else {
-                      stepContent = jsonData.message || "";
-                    }
-                    break;
-                  case "error":
-                    stepContent = t("chatInterface.parseFileFailed", {
-                      filename: jsonData.filename,
-                      message: jsonData.message,
-                    });
-                    break;
-                  case "file_processed":
-                    stepContent = t("chatInterface.fileParsed", {
-                      filename: jsonData.filename,
-                    });
-                    break;
-                  case "complete":
-                    // When complete, process all buffered truncation messages
-                    if (truncationBuffer.length > 0) {
-                      // Process truncation messages using internationalization
-                      const truncationInfo = truncationBuffer
-                        .map((truncation) => {
-                          if (truncation.message_data) {
-                            const i18nKey = getI18nKeyByType(truncation.type);
-                            return String(
-                              t(i18nKey, truncation.message_data.params)
-                            );
-                          } else {
-                            return truncation.message;
-                          }
-                        })
-                        .join(String(t("chatInterface.truncationSeparator")));
-
-                      stepContent = t(
-                        "chatInterface.fileParsingCompleteWithTruncation",
-                        {
-                          truncationInfo: truncationInfo,
-                        }
-                      );
-                    } else {
-                      stepContent = t("chatInterface.fileParsingComplete");
-                    }
-                    break;
-                  default:
-                    stepContent = jsonData.message || "";
-                }
-                // Only update the first content, don't add new ones
-                if (step && step.contents && step.contents.length > 0) {
-                  step.contents[0].content = stepContent;
-                  step.contents[0].timestamp = Date.now();
-                }
-              }
-              return newMessages;
-            });
-          },
+          () => {}, // Empty progress callback - won't be called
           t,
           currentConversationId
         );
-
-        // Handle preprocessing result
-        if (!result.success) {
-          // Reset button states immediately when preprocessing fails
-          setIsLoading(false);
-          setIsStreaming(false);
-            
-          // Remove from streaming conversations (both new and existing conversations)
-          if (currentConversationId) {
-            setStreamingConversations((prev) => {
-              const newSet = new Set(prev);
-              newSet.delete(currentConversationId);
-              return newSet;
-            });
-          }
-          
-          setSessionMessages((prev) => {
-            const newMessages = { ...prev };
-            const lastMsg =
-              newMessages[currentConversationId]?.[
-                newMessages[currentConversationId].length - 1
-              ];
-            
-            if (lastMsg && lastMsg.role === ROLE_ASSISTANT) {
-              // Handle error codes with internationalization
-              let errorMessage;
-              if (result.error === 'REQUEST_ENTITY_TOO_LARGE') {
-                errorMessage = t("chatInterface.fileSizeExceeded");
-              } else if (result.error === 'FILE_PARSING_FAILED') {
-                errorMessage = t("chatInterface.fileParsingFailed");
-              } else {
-                // For any other error, show a simple message
-                errorMessage = t("chatInterface.fileProcessingStopped");
-              }
-              
-              lastMsg.content = errorMessage;
-              lastMsg.isComplete = true;
-            }
-            
-            return newMessages;
-          });
-          shouldResetButtonStates = false; // Don't reset again in finally block
-          return;
-        }
 
         finalQuery = result.finalQuery;
         fileDescriptionsMap = result.fileDescriptions || {};
@@ -1433,25 +1238,6 @@ export function ChatInterface() {
         if (lastMsg && lastMsg.role === ROLE_ASSISTANT) {
           lastMsg.isComplete = true;
           lastMsg.thinking = undefined; // Explicitly clear thinking state
-
-          // If this was a preprocess step, mark it as stopped
-          if (lastMsg.steps && lastMsg.steps.length > 0) {
-            const preprocessStep = lastMsg.steps.find(
-              (step) => step.title === t("chatInterface.filePreprocessing")
-            );
-            if (preprocessStep) {
-              const stoppedMessage =
-                (t("chatInterface.fileProcessingStopped") as string) ||
-                "File preprocessing stopped";
-              preprocessStep.content = stoppedMessage;
-              if (
-                preprocessStep.contents &&
-                preprocessStep.contents.length > 0
-              ) {
-                preprocessStep.contents[0].content = stoppedMessage;
-              }
-            }
-          }
         }
         return newMessages;
       });
