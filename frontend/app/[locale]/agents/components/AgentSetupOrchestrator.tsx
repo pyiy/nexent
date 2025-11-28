@@ -501,11 +501,8 @@ export default function AgentSetupOrchestrator({
   const confirmOrRun = useCallback(
     (action: PendingAction) => {
       // In creation mode, always show save confirmation dialog when clicking debug
-      if (isCreatingNewAgent && !isEditingAgent) {
-        setPendingAction(() => action);
-        setConfirmContext("switch");
-        setIsSaveConfirmOpen(true);
-      } else if (hasUnsavedChanges) {
+      // Also show when there are unsaved changes
+      if ((isCreatingNewAgent && !isEditingAgent) || hasUnsavedChanges) {
         setPendingAction(() => action);
         setConfirmContext("switch");
         setIsSaveConfirmOpen(true);
