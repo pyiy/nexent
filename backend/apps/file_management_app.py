@@ -1,16 +1,13 @@
 import logging
-import os
 from http import HTTPStatus
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, File, Form, Header, HTTPException, Path as PathParam, Query, Request, UploadFile
+from fastapi import APIRouter, Body, File, Form, Header, HTTPException, Path as PathParam, Query, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 
 from consts.model import ProcessParams
 from services.file_management_service import upload_to_minio, upload_files_impl, \
-    get_file_url_impl, get_file_stream_impl, delete_file_impl, list_files_impl, \
-    preprocess_files_generator
-from utils.auth_utils import get_current_user_info
+    get_file_url_impl, get_file_stream_impl, delete_file_impl, list_files_impl
 from utils.file_management_utils import trigger_data_process
 
 logger = logging.getLogger("file_management_app")
@@ -271,61 +268,3 @@ async def get_storage_file_batch_urls(
         "failed_count": sum(1 for r in results if not r.get("success", False)),
         "results": results
     }
-
-
-@file_management_runtime_router.post("/preprocess")
-async def agent_preprocess_api(
-        request: Request, query: str = Form(...),
-        files: List[UploadFile] = File(...),
-        authorization: Optional[str] = Header(None)
-):
-    """
-    Preprocess uploaded files and return streaming response
-    """
-    try:
-        # Pre-read and cache all file contents
-        user_id, tenant_id, language = get_current_user_info(
-            authorization, request)
-        file_cache = []
-        for file in files:
-            try:
-                content = await file.read()
-                file_cache.append({
-                    "filename": file.filename or "",
-                    "content": content,
-                    "ext": os.path.splitext(file.filename or "")[1].lower()
-                })
-            except Exception as e:
-                file_cache.append({
-                    "filename": file.filename or "",
-                    "error": str(e)
-                })
-
-        # Generate unique task ID for this preprocess operation
-        import uuid
-        task_id = str(uuid.uuid4())
-        conversation_id = request.query_params.get("conversation_id")
-        if conversation_id:
-            conversation_id = int(conversation_id)
-        else:
-            conversation_id = -1  # Default for cases without conversation_id
-
-        # Call service layer to generate streaming response
-        return StreamingResponse(
-            preprocess_files_generator(
-                query=query,
-                file_cache=file_cache,
-                tenant_id=tenant_id,
-                language=language,
-                task_id=task_id,
-                conversation_id=conversation_id
-            ),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive"
-            }
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"File preprocessing error: {str(e)}")
