@@ -15,10 +15,11 @@ import {
   MarketAgentListParams,
   MarketAgentDetail,
 } from "@/types/market";
-import marketService from "@/services/marketService";
+import marketService, { MarketApiError } from "@/services/marketService";
 import { AgentMarketCard } from "./components/AgentMarketCard";
-import { importAgent } from "@/services/agentConfigService";
 import MarketAgentDetailModal from "./components/MarketAgentDetailModal";
+import AgentInstallModal from "./components/AgentInstallModal";
+import MarketErrorState from "./components/MarketErrorState";
 
 interface MarketContentProps {
   /** Connection status */
@@ -66,7 +67,9 @@ export default function MarketContent({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
   const [totalAgents, setTotalAgents] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<
+    "timeout" | "network" | "server" | "unknown" | null
+  >(null);
 
   // Detail modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -75,12 +78,19 @@ export default function MarketContent({
   );
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
-  // Load categories on mount
+  // Install modal state
+  const [installModalVisible, setInstallModalVisible] = useState(false);
+  const [installAgent, setInstallAgent] = useState<MarketAgentDetail | null>(
+    null
+  );
+
+  // Load categories and initial agents on mount
   useEffect(() => {
     loadCategories();
+    loadAgents(); // Auto-refresh on page load
   }, []);
 
-  // Load agents when category or page changes
+  // Load agents when category, page, or search changes (but not on initial mount)
   useEffect(() => {
     loadAgents();
   }, [currentCategory, currentPage, searchKeyword]);
@@ -90,13 +100,18 @@ export default function MarketContent({
    */
   const loadCategories = async () => {
     setIsLoadingCategories(true);
-    setError(null);
+    setErrorType(null);
     try {
       const data = await marketService.fetchMarketCategories();
       setCategories(data);
     } catch (error) {
       log.error("Failed to load market categories:", error);
-      setError(t("market.error.loadCategories", "Failed to load categories"));
+      
+      if (error instanceof MarketApiError) {
+        setErrorType(error.type);
+      } else {
+        setErrorType("unknown");
+      }
     } finally {
       setIsLoadingCategories(false);
     }
@@ -107,7 +122,7 @@ export default function MarketContent({
    */
   const loadAgents = async () => {
     setIsLoadingAgents(true);
-    setError(null);
+    setErrorType(null);
     try {
       const params: MarketAgentListParams = {
         page: currentPage,
@@ -127,7 +142,13 @@ export default function MarketContent({
       setTotalAgents(data.pagination.total);
     } catch (error) {
       log.error("Failed to load market agents:", error);
-      setError(t("market.error.loadAgents", "Failed to load agents"));
+      
+      if (error instanceof MarketApiError) {
+        setErrorType(error.type);
+      } else {
+        setErrorType("unknown");
+      }
+      
       setAgents([]);
       setTotalAgents(0);
     } finally {
@@ -189,47 +210,45 @@ export default function MarketContent({
   };
 
   /**
-   * Handle agent download
+   * Handle agent download - Opens install wizard
    */
   const handleDownload = async (agent: MarketAgentListItem) => {
     try {
-      message.loading({
-        content: t("market.downloading", "Downloading agent..."),
-        key: "download",
-        duration: 0,
-      });
-
-      // Fetch full agent details including agent_json
+      setIsLoadingDetail(true);
+      // Fetch full agent details for installation
       const agentDetail = await marketService.fetchMarketAgentDetail(
         agent.agent_id
       );
-
-      // Import the agent using the agent_json
-      const result = await importAgent(agentDetail.agent_json);
-
-      if (result.success) {
-        message.success({
-          content: t(
-            "market.downloadSuccess",
-            "Agent downloaded successfully!"
-          ),
-          key: "download",
-        });
-      } else {
-        message.error({
-          content:
-            result.message ||
-            t("market.downloadFailed", "Failed to download agent"),
-          key: "download",
-        });
-      }
+      setInstallAgent(agentDetail);
+      setInstallModalVisible(true);
     } catch (error) {
-      log.error("Failed to download agent:", error);
-      message.error({
-        content: t("market.downloadFailed", "Failed to download agent"),
-        key: "download",
-      });
+      log.error("Failed to load agent details for installation:", error);
+      message.error(
+        t("market.error.fetchDetailFailed", "Failed to load agent details")
+      );
+    } finally {
+      setIsLoadingDetail(false);
     }
+  };
+
+  /**
+   * Handle install complete
+   */
+  const handleInstallComplete = () => {
+    setInstallModalVisible(false);
+    setInstallAgent(null);
+    // Optionally reload agents or show success message
+    message.success(
+      t("market.install.success", "Agent installed successfully!")
+    );
+  };
+
+  /**
+   * Handle install cancel
+   */
+  const handleInstallCancel = () => {
+    setInstallModalVisible(false);
+    setInstallAgent(null);
   };
 
   /**
@@ -308,124 +327,118 @@ export default function MarketContent({
                 </motion.div>
               </div>
 
-              {/* Error message */}
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3"
-                >
-                  <AlertCircle className="h-5 w-5 text-red-500" />
-                  <span className="text-red-700 dark:text-red-300">
-                    {error}
-                </span>
-                </motion.div>
-              )}
-
-              {/* Search bar */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="mb-6"
-              >
-                <Input
-                  size="large"
-                  placeholder={t(
-                    "market.searchPlaceholder",
-                    "Search agents by name or description..."
-                  )}
-                  prefix={<Search className="h-4 w-4 text-slate-400" />}
-                  value={searchKeyword}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  allowClear
-                  className="max-w-md"
-                />
-              </motion.div>
-
-              {/* Category tabs */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-                className="mb-6"
-              >
-                {isLoadingCategories ? (
-                  <div className="flex justify-center py-8">
-                    <Spin size="large" />
-                  </div>
-                ) : (
-                  <Tabs
-                    activeKey={currentCategory}
-                    items={tabItems}
-                    onChange={handleCategoryChange}
-                    size="large"
-                  />
-                )}
-              </motion.div>
-
-              {/* Agents grid */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-              >
-                {isLoadingAgents ? (
-                  <div className="flex justify-center py-16">
-                    <Spin size="large" />
-                  </div>
-                ) : agents.length === 0 ? (
-                  <Empty
-                    description={t(
-                      "market.noAgents",
-                      "No agents found in this category"
-                    )}
-                    className="py-16"
-                  />
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-8">
-                      {agents.map((agent, index) => (
-            <motion.div
-                          key={agent.id}
-                          initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-                          transition={{
-                            duration: 0.3,
-                            delay: 0.05 * index,
-                          }}
-                          className="h-full"
-                        >
-                          <AgentMarketCard
-                            agent={agent}
-                            onDownload={handleDownload}
-                            onViewDetails={handleViewDetails}
-                          />
-                        </motion.div>
-                      ))}
-                    </div>
-
-                    {/* Pagination */}
-                    {totalAgents > pageSize && (
-                      <div className="flex justify-center mt-8">
-                        <Pagination
-                          current={currentPage}
-                          total={totalAgents}
-                          pageSize={pageSize}
-                          onChange={handlePageChange}
-                          showSizeChanger={false}
-                          showTotal={(total) =>
-                            t("market.totalAgents", {
-                              defaultValue: "Total {{total}} agents",
-                              total,
-                            })
-                          }
-                        />
+              {/* Only show search and content if no error */}
+              {!errorType ? (
+                <>
+                  {/* Search bar */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="mb-6"
+                  >
+                    <Input
+                      size="large"
+                      placeholder={t(
+                        "market.searchPlaceholder",
+                        "Search agents by name or description..."
+                      )}
+                      prefix={<Search className="h-4 w-4 text-slate-400" />}
+                      value={searchKeyword}
+                      onChange={(e) => handleSearch(e.target.value)}
+                      allowClear
+                      className="max-w-md"
+                    />
+                  </motion.div>
+                  {/* Category tabs */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.5, delay: 0.3 }}
+                    className="mb-6"
+                  >
+                    {isLoadingCategories ? (
+                      <div className="flex justify-center py-8">
+                        <Spin size="large" />
                       </div>
+                    ) : (
+                      <Tabs
+                        activeKey={currentCategory}
+                        items={tabItems}
+                        onChange={handleCategoryChange}
+                        size="large"
+                      />
                     )}
-                  </>
-                )}
-            </motion.div>
+                  </motion.div>
+
+                  {/* Agents grid */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.5, delay: 0.4 }}
+                  >
+                    {isLoadingAgents ? (
+                      <div className="flex justify-center py-16">
+                        <Spin size="large" />
+                      </div>
+                    ) : agents.length === 0 ? (
+                      <Empty
+                        description={t(
+                          "market.noAgents",
+                          "No agents found in this category"
+                        )}
+                        className="py-16"
+                      />
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-8">
+                          {agents.map((agent, index) => (
+                            <motion.div
+                              key={agent.id}
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{
+                                duration: 0.3,
+                                delay: 0.05 * index,
+                              }}
+                              className="h-full"
+                            >
+                              <AgentMarketCard
+                                agent={agent}
+                                onDownload={handleDownload}
+                                onViewDetails={handleViewDetails}
+                              />
+                            </motion.div>
+                          ))}
+                        </div>
+
+                        {/* Pagination */}
+                        {totalAgents > pageSize && (
+                          <div className="flex justify-center mt-8">
+                            <Pagination
+                              current={currentPage}
+                              total={totalAgents}
+                              pageSize={pageSize}
+                              onChange={handlePageChange}
+                              showSizeChanger={false}
+                              showTotal={(total) =>
+                                t("market.totalAgents", {
+                                  defaultValue: "Total {{total}} agents",
+                                  total,
+                                })
+                              }
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </motion.div>
+                </>
+              ) : (
+                /* Error state - only show when there's an error */
+                !isLoadingAgents &&
+                !isLoadingCategories && <MarketErrorState type={errorType} />
+              )}
             </div>
           </div>
 
@@ -435,6 +448,14 @@ export default function MarketContent({
             onClose={handleCloseDetail}
             agentDetails={selectedAgent}
             loading={isLoadingDetail}
+          />
+
+          {/* Agent Install Modal */}
+          <AgentInstallModal
+            visible={installModalVisible}
+            agentDetails={installAgent}
+            onCancel={handleInstallCancel}
+            onInstallComplete={handleInstallComplete}
           />
         </motion.div>
       ) : null}

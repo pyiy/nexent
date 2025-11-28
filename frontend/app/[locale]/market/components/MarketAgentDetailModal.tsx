@@ -4,8 +4,6 @@ import React from "react";
 import { Modal, Tabs, Tag, Descriptions, Empty } from "antd";
 import { useTranslation } from "react-i18next";
 import {
-  CheckCircle,
-  XCircle,
   Bot,
   Settings,
   FileText,
@@ -14,6 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { MarketAgentDetail } from "@/types/market";
+import { getToolSourceLabel, getGenericLabel } from "@/lib/agentLabelMapper";
 
 interface MarketAgentDetailModalProps {
   visible: boolean;
@@ -62,6 +61,7 @@ export default function MarketAgentDetailModal({
     }
     return value || "-";
   };
+
 
   const items = [
     {
@@ -116,7 +116,7 @@ export default function MarketAgentDetailModal({
                 <div className="flex flex-wrap gap-1">
                   {agentDetails.tags.map((tag) => (
                     <Tag key={tag.id} color="blue">
-                      {tag.display_name}
+                      {getGenericLabel(tag.display_name, t)}
                     </Tag>
                   ))}
                 </div>
@@ -168,12 +168,9 @@ export default function MarketAgentDetailModal({
               {agentDetails?.max_steps || 0}
             </Descriptions.Item>
             <Descriptions.Item
-              label={t(
-                "market.detail.businessLogicModel",
-                "Business Logic Model"
-              )}
+              label={t("market.detail.recommendedModel", "Recommended Model")}
             >
-              {renderFieldValue(agentDetails?.business_logic_model_name)}
+              {renderFieldValue(agentDetails?.model_name)}
             </Descriptions.Item>
             <Descriptions.Item
               label={t(
@@ -297,16 +294,18 @@ export default function MarketAgentDetailModal({
                 <div className="flex gap-2 flex-wrap">
                   {tool.source && (
                     <Tag color="blue">
-                      {t("market.detail.toolSource", "Source")}: {tool.source}
+                      {t("common.source", "Source")}: {getToolSourceLabel(tool.source, t)}
                     </Tag>
                   )}
                   {tool.usage && (
                     <Tag color="green">
-                      {t("market.detail.toolUsage", "Usage")}: {tool.usage}
+                      {t("common.usage", "Usage")}: {tool.usage}
                     </Tag>
                   )}
                   {tool.output_type && (
-                    <Tag color="purple">Output: {tool.output_type}</Tag>
+                    <Tag color="purple">
+                      {t("common.output", "Output")}: {tool.output_type}
+                    </Tag>
                   )}
                 </div>
               </div>

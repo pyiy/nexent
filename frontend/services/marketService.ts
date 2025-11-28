@@ -13,6 +13,70 @@ import {
   MarketAgentListParams,
 } from '@/types/market';
 
+// Market API timeout in milliseconds (5 seconds)
+const MARKET_API_TIMEOUT = 5000;
+
+/**
+ * Custom error class for market API errors
+ */
+export class MarketApiError extends Error {
+  constructor(
+    message: string,
+    public type: 'timeout' | 'network' | 'server' | 'unknown' = 'unknown',
+    public statusCode?: number
+  ) {
+    super(message);
+    this.name = 'MarketApiError';
+  }
+}
+
+/**
+ * Fetch with timeout support
+ * @param url - Request URL
+ * @param options - Fetch options
+ * @param timeout - Timeout in milliseconds
+ * @returns Promise<Response>
+ * @throws MarketApiError on timeout or network error
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeout: number = MARKET_API_TIMEOUT
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new MarketApiError(
+        'Request timeout - market server is not responding',
+        'timeout'
+      );
+    }
+    
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      throw new MarketApiError(
+        'Network error - unable to connect to market server',
+        'network'
+      );
+    }
+    
+    throw new MarketApiError(
+      error.message || 'Unknown error occurred',
+      'unknown'
+    );
+  }
+}
+
 /**
  * Fetch agent list from market with pagination and filters
  */
@@ -21,7 +85,7 @@ export async function fetchMarketAgentList(
 ): Promise<MarketAgentListResponse> {
   try {
     const url = API_ENDPOINTS.market.agents(params);
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -29,7 +93,11 @@ export async function fetchMarketAgentList(
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch market agents: ${response.statusText}`);
+      throw new MarketApiError(
+        `Failed to fetch market agents: ${response.statusText}`,
+        'server',
+        response.status
+      );
     }
 
     const data = await response.json();
@@ -48,7 +116,7 @@ export async function fetchMarketAgentDetail(
 ): Promise<MarketAgentDetail> {
   try {
     const url = API_ENDPOINTS.market.agentDetail(agentId);
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -56,8 +124,10 @@ export async function fetchMarketAgentDetail(
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to fetch market agent detail: ${response.statusText}`
+      throw new MarketApiError(
+        `Failed to fetch market agent detail: ${response.statusText}`,
+        'server',
+        response.status
       );
     }
 
@@ -75,7 +145,7 @@ export async function fetchMarketAgentDetail(
 export async function fetchMarketCategories(): Promise<MarketCategory[]> {
   try {
     const url = API_ENDPOINTS.market.categories;
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -83,8 +153,10 @@ export async function fetchMarketCategories(): Promise<MarketCategory[]> {
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to fetch market categories: ${response.statusText}`
+      throw new MarketApiError(
+        `Failed to fetch market categories: ${response.statusText}`,
+        'server',
+        response.status
       );
     }
 
@@ -102,7 +174,7 @@ export async function fetchMarketCategories(): Promise<MarketCategory[]> {
 export async function fetchMarketTags(): Promise<MarketTag[]> {
   try {
     const url = API_ENDPOINTS.market.tags;
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -110,7 +182,11 @@ export async function fetchMarketTags(): Promise<MarketTag[]> {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch market tags: ${response.statusText}`);
+      throw new MarketApiError(
+        `Failed to fetch market tags: ${response.statusText}`,
+        'server',
+        response.status
+      );
     }
 
     const data = await response.json();
@@ -129,7 +205,7 @@ export async function fetchMarketAgentMcpServers(
 ): Promise<MarketMcpServer[]> {
   try {
     const url = API_ENDPOINTS.market.mcpServers(agentId);
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -137,8 +213,10 @@ export async function fetchMarketAgentMcpServers(
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to fetch agent MCP servers: ${response.statusText}`
+      throw new MarketApiError(
+        `Failed to fetch agent MCP servers: ${response.statusText}`,
+        'server',
+        response.status
       );
     }
 
