@@ -119,7 +119,7 @@ def test_upload_bytes_to_minio_generates_object_name(monkeypatch):
     assert result == "/bucket/generated.bin"
     assert captured["data"] == b"payload"
     assert captured["object_name"] == "generated.bin"
-    assert captured["bucket"] == "multi-modal"
+    assert captured["bucket"] == "nexent"
 
 
 def test_upload_bytes_to_minio_generates_name_without_extension(monkeypatch):
