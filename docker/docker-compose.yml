@@ -271,7 +271,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
-      - ${ROOT_DIR}/minio/data:/data
+      - ${ROOT_DIR}/minio/data:/etc/minio/data
     networks:
       - nexent
     restart: always

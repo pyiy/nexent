@@ -16,12 +16,12 @@ Each message should include your name/handle and date.
 Keep messages respectful and in line with our Code of Conduct.
 -->
 
-::: info techbro_kevin - 2025-06-15
-first time doing open source, nexent is pretty cool! natural language to create agents, way easier than i thought
+::: tip product_guy - 2025-02-07
+no more PRDs!! just describe in plain english and devs get it instantly
 :::
 
-::: warning Dr. Chen - AI Algorithm Engineer - 2025-06-25
-Moving from LangChain to the MCP ecosystem was definitely the right choice. Nexent's MCP tool integration makes our team's workflow much more standardized, especially when handling enterprise applications. The "USB-C of AI" analogy is so apt! Now our agents can seamlessly connect to various external services - no more headaches over different API formats.
+::: info techbro_kevin - 2025-06-15
+first time doing open source, nexent is pretty cool! natural language to create agents, way easier than i thought
 :::
 
 ::: tip startup_dev - 2025-06-18
@@ -36,16 +36,16 @@ working on multi-agent stuff, the knowledge tracing feature caught my eye. built
 first contribution was fixing a typo lmao... but community is super friendly! now using nexent for personal knowledge management, feels like having a second brain
 :::
 
+::: warning Dr. Chen - AI Algorithm Engineer - 2025-06-25
+Moving from LangChain to the MCP ecosystem was definitely the right choice. Nexent's MCP tool integration makes our team's workflow much more standardized, especially when handling enterprise applications. The "USB-C of AI" analogy is so apt! Now our agents can seamlessly connect to various external services - no more headaches over different API formats.
+:::
+
 ::: warning mldev2025 - 2025-06-25
 moved from langchain to MCP, good choice. the "USB-C of AI" analogy is spot on
 :::
 
 ::: info college_student - 2025-07-28  
 zero-code actually works! just described what i wanted and boom, got an agent. handles pdfs and everything
-:::
-
-::: tip product_guy - 2025-02-07
-no more PRDs!! just describe in plain english and devs get it instantly
 :::
 
 ::: info Tom Park - University of Toronto CS Student - 2025-08-03
@@ -64,6 +64,10 @@ just dropping by to say nice work 👍 starred the repo
 Really impressed by Nexent — smooth interface and powerful agent framework. Great work!
 :::
 
+::: info gsong - 2025-11-26
+Nexent represents the future of intelligent agent creation — simple, elegant, and incredibly powerful. As a true zero-code platform, it eliminates the need for orchestration or complex drag-and-drop workflows, allowing anyone to build agents using pure natural language. Built on the robust MCP ecosystem with rich tool integrations, Nexent goes far beyond basic automation by offering a suite of built-in agents tailored for real-world scenarios — from work and travel to everyday life. Its capabilities for agent execution control, multi-agent collaboration, data processing and knowledge tracing, multimodal dialogue, and batch scaling set a new benchmark in intelligent service platforms. Nexent doesn’t just accelerate development — it redefines what’s possible.
+:::
+
 ::: info uu - 2024-01-15
-华为ICT智能体，感谢nexent平台支持！
+Huawei ICT Agent, thanks to the nexent platform for its support!
 :::

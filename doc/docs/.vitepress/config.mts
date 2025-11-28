@@ -163,6 +163,10 @@ export default defineConfig({
             text: "MCP Ecosystem",
             items: [
               { text: "Overview", link: "/en/mcp-ecosystem/overview" },
+              {
+                text: "MCP Server Development",
+                link: "/en/mcp-ecosystem/mcp-server-development",
+              },
               { text: "Use Cases", link: "/en/mcp-ecosystem/use-cases" },
             ],
           },
@@ -326,6 +330,10 @@ export default defineConfig({
             text: "MCP 生态系统",
             items: [
               { text: "概览", link: "/zh/mcp-ecosystem/overview" },
+              {
+                text: "MCP 服务开发",
+                link: "/zh/mcp-ecosystem/mcp-server-development",
+              },
               { text: "用例场景", link: "/zh/mcp-ecosystem/use-cases" },
             ],
           },

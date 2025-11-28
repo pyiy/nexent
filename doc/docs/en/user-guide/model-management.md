@@ -17,8 +17,8 @@ Click the app icon to open the configuration panel. Nexent provides two options:
 - **Upload a custom image**: Supports PNG and JPG (≤2 MB).
 
 <div style="display: flex; gap: 8px;">
-  <img src="./assets/app/predefined-app-icon-setting.png" style="width: 50%; height: 100%;" />
-  <img src="./assets/app/customized-app-icon-setting.png" style="width: 50%; height: 80%;" />
+  <img src="./assets/model-management/predefined-app-icon-setting.png" style="width: 50%; height: 100%;" />
+  <img src="./assets/model-management/customized-app-icon-setting.png" style="width: 50%; height: 80%;" />
 </div>
 
 ### App Name & Description
@@ -34,7 +34,7 @@ Click the app icon to open the configuration panel. Nexent provides two options:
 - Highlight the core capabilities and keep the text fluent and concise.
 
 <div style="display: flex; justify-content: left;">
-  <img src="./assets/app/app-name-description-setting.png" style="width: 50%; height: auto;" />
+  <img src="./assets/model-management/app-name-description-setting.png" style="width: 50%; height: auto;" />
 </div>
 
 ## 🤖 Model Configuration
@@ -68,7 +68,7 @@ Nexent will soon support seamless integration with the ModelEngine platform so y
    - Click **Add** to place the model in the available list.
 
 <div style="display: flex; justify-content: left;">
-  <img src="./assets/model/add-model.png" style="width: 50%; height: auto;" />
+  <img src="./assets/model-management/add-model.png" style="width: 50%; height: auto;" />
 </div>
 
 #### Batch Add Models
@@ -84,7 +84,7 @@ Use batch import to speed up onboarding:
 7. Click **Add** to save every selected model at once.
 
 <div style="display: flex; justify-content: left;">
-  <img src="./assets/model/add-model-batch.png" style="width: 50%; height: auto;" />
+  <img src="./assets/model-management/add-model-batch.png" style="width: 50%; height: auto;" />
 </div>
 
 ### 🔧 Edit Custom Models
@@ -98,46 +98,46 @@ Modify or delete models anytime:
 5. For single models, click the trash icon 🗑️ to delete, or click the model name to open the edit dialog.
 
 <div style="display: flex; gap: 8px;">
-  <img src="./assets/model/edit-model-1.png" style="width: 50%; height: 100%;" />
-  <img src="./assets/model/edit-model-2.png" style="width: 50%; height: 80%;" />
+  <img src="./assets/model-management/edit-model-1.png" style="width: 50%; height: 100%;" />
+  <img src="./assets/model-management/edit-model-2.png" style="width: 50%; height: 80%;" />
 </div>
 <br>
 <div style="display: flex; gap: 8px;">
-  <img src="./assets/model/edit-model-3.png" style="width: 50%; height: 100%;" />
-  <img src="./assets/model/edit-model-4.png" style="width: 50%; height: 80%;" />
+  <img src="./assets/model-management/edit-model-3.png" style="width: 50%; height: 100%;" />
+  <img src="./assets/model-management/edit-model-4.png" style="width: 50%; height: 80%;" />
 </div>
 <br>
 <div style="display: flex; gap: 8px;">
-  <img src="./assets/model/edit-model-5.png" style="width: 50%; height: 100%;" />
-  <img src="./assets/model/edit-model-6.png" style="width: 50%; height: 80%;" />
+  <img src="./assets/model-management/edit-model-5.png" style="width: 50%; height: 100%;" />
+  <img src="./assets/model-management/edit-model-6.png" style="width: 50%; height: 80%;" />
 </div>
 
-## ⚙️ Configure System Models
+### ⚙️ Configure System Models
 
 After adding models, assign the platform-level defaults. These models handle system tasks such as title generation, real-time file reading, and multimodal parsing. Individual agents can still choose their own run-time models.
 
-### Base Model
+#### Base Model
 
 - Used for core platform features (title generation, real-time file access, basic text processing).
 - Choose any added large language model from the dropdown.
 
-### Embedding Model
+#### Embedding Model
 
 - Powers semantic search for text, images, and other knowledge-base content.
 - Select one of the added embedding models.
 
-### Vision-Language Model
+#### Vision-Language Model
 
 - Required for multimodal chat scenarios (for example, when users upload images).
 - Pick one of the added vision-language models.
 
 <div style="display: flex; gap: 8px;">
-  <img src="./assets/model/select-model-1.png" style="width: 30%; height: 100%;" />
-  <img src="./assets/model/select-model-2.png" style="width: 30%; height: 100%;" />
-  <img src="./assets/model/select-model-3.png" style="width: 30%; height: 100%;" />
+  <img src="./assets/model-management/select-model-1.png" style="width: 30%; height: 100%;" />
+  <img src="./assets/model-management/select-model-2.png" style="width: 30%; height: 100%;" />
+  <img src="./assets/model-management/select-model-3.png" style="width: 30%; height: 100%;" />
 </div>
 
-## ✅ Check Model Connectivity
+### ✅ Check Model Connectivity
 
 Run regular connectivity checks to keep the platform healthy:
 
@@ -157,9 +157,9 @@ Troubleshooting tips:
 - Check the provider’s service status.
 - Review firewall and security policies.
 
-## 🤖 Supported Providers
+### 🤖 Supported Providers
 
-### Large Language Models
+#### Large Language Models
 
 Nexent supports any **OpenAI-compatible** provider, including:
 
@@ -178,15 +178,15 @@ Getting started:
 3. Locate the API endpoint (usually ending with `/v1`).
 4. Click **Add Custom Model** in Nexent and fill in the required fields.
 
-### Multimodal Vision Models
+#### Multimodal Vision Models
 
 Use the same API key and URL as LLMs but specify a multimodal model name, for example **Qwen/Qwen2.5-VL-32B-Instruct** on SiliconFlow.
 
-### Embedding Models
+#### Embedding Models
 
 Use the same API key as LLMs but typically a different endpoint (often `/v1/embeddings`), for example **BAAI/bge-m3** from SiliconFlow.
 
-### Speech Models
+#### Speech Models
 
 Currently only **VolcEngine Voice** is supported and must be configured via `.env`:
 

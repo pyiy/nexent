@@ -11,6 +11,7 @@ class ToolSign(Enum):
     TAVILY_SEARCH = "d"  # Tavily search tool identifier
     FILE_OPERATION = "f"      # File operation tool identifier
     TERMINAL_OPERATION = "t"  # Terminal operation tool identifier
+    MULTIMODAL_OPERATION = "m" # Multimodal operation tool identifier
 
 
 # Tool sign mapping for backward compatibility
@@ -21,6 +22,7 @@ TOOL_SIGN_MAPPING = {
     "exa_search": ToolSign.EXA_SEARCH.value,
     "file_operation": ToolSign.FILE_OPERATION.value,
     "terminal_operation": ToolSign.TERMINAL_OPERATION.value,
+    "multimodal_operation": ToolSign.MULTIMODAL_OPERATION.value,
 }
 
 # Reverse mapping for lookup
@@ -33,6 +35,7 @@ class ToolCategory(Enum):
     FILE = "file"
     EMAIL = "email"
     TERMINAL = "terminal"
+    MULTIMODAL = "multimodal"
 
 
 @dataclass

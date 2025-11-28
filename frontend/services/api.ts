@@ -106,6 +106,10 @@ export const API_ENDPOINTS = {
     indexDetail: (indexName: string) => `${API_BASE_URL}/indices/${indexName}`,
     chunks: (indexName: string) =>
       `${API_BASE_URL}/indices/${indexName}/chunks`,
+    chunk: (indexName: string) => `${API_BASE_URL}/indices/${indexName}/chunk`,
+    chunkDetail: (indexName: string, chunkId: string) =>
+      `${API_BASE_URL}/indices/${indexName}/chunk/${chunkId}`,
+    searchHybrid: `${API_BASE_URL}/indices/search/hybrid`,
     summary: (indexName: string) =>
       `${API_BASE_URL}/summary/${indexName}/auto_summary`,
     changeSummary: (indexName: string) =>
