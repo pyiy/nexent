@@ -13,7 +13,7 @@ const handle = app.getRequestHandler();
 const HTTP_BACKEND = process.env.HTTP_BACKEND || 'http://localhost:5010'; // config
 const WS_BACKEND = process.env.WS_BACKEND || 'ws://localhost:5014'; // runtime
 const RUNTIME_HTTP_BACKEND = process.env.RUNTIME_HTTP_BACKEND || 'http://localhost:5014'; // runtime
-const MINIO_BACKEND = process.env.MINIO_ENDPOINT || 'http://localhost:9000';
+const MINIO_BACKEND = process.env.MINIO_ENDPOINT || 'http://localhost:9010';
 const PORT = 3000;
 
 const proxy = createProxyServer();
