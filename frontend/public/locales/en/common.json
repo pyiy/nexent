@@ -926,6 +926,7 @@
   "agentConfig.agents.listFetchFailedDebug": "Failed to fetch Agent list:",
   "agentConfig.modals.saveConfirm.title": "Unsaved changes",
   "agentConfig.modals.saveConfirm.content": "You have unsaved changes. Would you like to save them now?",
+  "agentConfig.modals.saveConfirm.invalidContent": "Current configuration cannot be saved: {{invalidReason}}. Please modify and try again.",
   "agentConfig.modals.saveConfirm.discard": "Discard",
   "agentConfig.modals.saveConfirm.save": "Save",
 
