@@ -99,8 +99,6 @@ class AnalyzeImageTool(Tool):
         if self.observer:
             running_prompt = self.running_prompt_zh if self.observer.lang == "zh" else self.running_prompt_en
             self.observer.add_message("", ProcessType.TOOL, running_prompt)
-            card_content = [{"icon": "image", "text": f"Analyzing images..."}]
-            self.observer.add_message("", ProcessType.CARD, json.dumps(card_content, ensure_ascii=False))
 
         if image_urls_list is None:
             raise ValueError("image_urls cannot be None")

@@ -314,13 +314,12 @@ async def join_minio_file_description_to_query(minio_files, query):
     if minio_files and isinstance(minio_files, list):
         file_descriptions = []
         for file in minio_files:
-            if isinstance(file, dict) and "description" in file and file["description"]:
-                file_descriptions.append(file["description"])
-
+            if isinstance(file, dict) and "url" in file and file["url"] and "name" in file and file["name"]:
+                file_descriptions.append(f"File name: {file['name']}, S3 URL: s3:/{file['url']}")
         if file_descriptions:
-            final_query = "User provided some reference files:\n"
+            final_query = "User uploaded files. The file information is as follows:\n"
             final_query += "\n".join(file_descriptions) + "\n\n"
-            final_query += f"User wants to answer questions based on the above information: {query}"
+            final_query += f"User wants to answer questions based on the information in the above files: {query}"
     return final_query
 
 

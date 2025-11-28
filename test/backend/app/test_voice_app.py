@@ -20,7 +20,8 @@ from consts.exceptions import (
 class MockVoiceService:
     def __init__(self):
         self.start_stt_streaming_session = AsyncMock()
-        self.stream_tts_to_websocket = AsyncMock()
+        # Make stream_tts_to_websocket complete immediately
+        self.stream_tts_to_websocket = AsyncMock(return_value=None)
         self.check_voice_connectivity = AsyncMock(return_value=True)
 
 
@@ -85,9 +86,11 @@ class TestVoiceApp:
             with self.client.websocket_connect("/voice/tts/ws") as websocket:
                 # Send text data
                 websocket.send_json({"text": "Hello, world!"})
-                
-                # Verify service method was called
-                mock_service.stream_tts_to_websocket.assert_called_once()
+                # The websocket context manager will wait for connection to close
+                # which happens after stream_tts_to_websocket completes in the finally block
+            
+            # Verify service method was called after websocket context exits
+            mock_service.stream_tts_to_websocket.assert_called_once()
 
     def test_tts_websocket_no_text(self):
         """Test TTS WebSocket with no text provided"""
@@ -344,19 +347,24 @@ class TestVoiceAppIntegration:
         with patch('apps.voice_app.get_voice_service') as mock_get_service:
             # Create a mock service that behaves like the real one
             mock_service = Mock()
-            mock_service.stream_tts_to_websocket = AsyncMock()
+            mock_service.stream_tts_to_websocket = AsyncMock(return_value=None)
             mock_get_service.return_value = mock_service
             
             with self.client.websocket_connect("/voice/tts/ws") as websocket:
                 # Send text data
                 websocket.send_json({"text": "Hello, world!"})
                 
-                # Verify the service method was called with correct parameters
-                mock_service.stream_tts_to_websocket.assert_called_once()
-                
-                # Get the call arguments
-                call_args = mock_service.stream_tts_to_websocket.call_args
-                assert call_args[0][1] == "Hello, world!"  # Second argument should be the text
+                # Wait for async operation to complete
+                # The websocket context manager will wait for connection to close
+                # which happens after stream_tts_to_websocket completes
+                pass
+            
+            # Verify the service method was called with correct parameters
+            mock_service.stream_tts_to_websocket.assert_called_once()
+            
+            # Get the call arguments
+            call_args = mock_service.stream_tts_to_websocket.call_args
+            assert call_args[0][1] == "Hello, world!"  # Second argument should be the text
 
 
 if __name__ == "__main__":

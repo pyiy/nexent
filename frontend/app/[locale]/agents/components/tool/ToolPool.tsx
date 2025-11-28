@@ -3,12 +3,13 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button, App, Tabs, Collapse } from "antd";
+import { Button, App, Tabs, Collapse, Tooltip } from "antd";
 import {
   SettingOutlined,
   LoadingOutlined,
   ApiOutlined,
   ReloadOutlined,
+  BulbOutlined,
 } from "@ant-design/icons";
 
 import { TOOL_SOURCE_TYPES } from "@/const/agentConfig";
@@ -643,6 +644,25 @@ function ToolPool({
           <h4 className="text-md font-medium text-gray-700">
             {t("toolPool.title")}
           </h4>
+          <Tooltip
+            title={
+              <div style={{ whiteSpace: "pre-line" }}>
+                {t("toolPool.tooltip.functionGuide")}
+              </div>
+            }
+            overlayInnerStyle={{
+              backgroundColor: "#ffffff",
+              color: "#374151",
+              border: "1px solid #e5e7eb",
+              borderRadius: "6px",
+              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+              padding: "12px",
+              maxWidth: "600px",
+              minWidth: "400px",
+            }}
+          >
+            <BulbOutlined className="ml-2 text-yellow-500" />
+          </Tooltip>
         </div>
         <div className="flex items-center gap-2">
           <Button
