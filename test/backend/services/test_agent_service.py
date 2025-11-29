@@ -1782,6 +1782,28 @@ async def test_export_agent_by_agent_id_success(mock_search_agent_info, mock_cre
             usage=None
         ),
         ToolConfig(
+            class_name="AnalyzeTextFileTool",
+            name="Text Analyzer",
+            source="source3",
+            params={"param4": "value4"},
+            metadata={"text": "data"},
+            description="Text analysis tool",
+            inputs="text file",
+            output_type="analysis",
+            usage=None
+        ),
+        ToolConfig(
+            class_name="AnalyzeImageTool",
+            name="Image Analyzer",
+            source="source4",
+            params={"param5": "value5"},
+            metadata={"image": "data"},
+            description="Image analysis tool",
+            inputs="image file",
+            output_type="analysis result",
+            usage=None
+        ),
+        ToolConfig(
             class_name="MCPTool",
             name="MCP Tool",
             source="mcp",
@@ -1810,13 +1832,21 @@ async def test_export_agent_by_agent_id_success(mock_search_agent_info, mock_cre
     assert result.agent_id == 123
     assert result.name == "Test Agent"
     assert result.business_description == "For testing purposes"
-    assert len(result.tools) == 3
+    assert len(result.tools) == 5
     assert result.managed_agents == mock_sub_agent_ids
 
     # Verify KnowledgeBaseSearchTool metadata is empty
     knowledge_tool = next(
         tool for tool in result.tools if tool.class_name == "KnowledgeBaseSearchTool")
     assert knowledge_tool.metadata == {}
+
+    analyze_text_tool = next(
+        tool for tool in result.tools if tool.class_name == "AnalyzeTextFileTool")
+    assert analyze_text_tool.metadata == {}
+
+    analyze_image_tool = next(
+        tool for tool in result.tools if tool.class_name == "AnalyzeImageTool")
+    assert analyze_image_tool.metadata == {}
 
     # Verify MCP tool has usage field
     mcp_tool = next(
