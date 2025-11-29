@@ -9,6 +9,7 @@ from nexent.core.utils.observer import MessageObserver
 from nexent.core.agents.agent_model import AgentRunInfo, ModelConfig, AgentConfig, ToolConfig
 from nexent.memory.memory_service import search_memory_in_levels
 
+from services.file_management_service import get_llm_model
 from services.vectordatabase_service import (
     ElasticSearchService,
     get_vector_db_core,
@@ -17,13 +18,15 @@ from services.vectordatabase_service import (
 from services.tenant_config_service import get_selected_knowledge_list
 from services.remote_mcp_service import get_remote_mcp_server_list
 from services.memory_config_service import build_memory_context
+from services.image_service import get_vlm_model
 from database.agent_db import search_agent_info_by_agent_id, query_sub_agents_id_list
 from database.tool_db import search_tools_for_sub_agent
 from database.model_management_db import get_model_records, get_model_by_model_id
+from database.client import minio_client
 from utils.model_name_utils import add_repo_to_name
 from utils.prompt_template_utils import get_agent_prompt_template
 from utils.config_utils import tenant_config_manager, get_model_name_from_config
-from consts.const import LOCAL_MCP_SERVER, MODEL_CONFIG_MAPPING, LANGUAGE
+from consts.const import LOCAL_MCP_SERVER, MODEL_CONFIG_MAPPING, LANGUAGE, DATA_PROCESS_SERVICE
 
 logger = logging.getLogger("create_agent_info")
 logger.setLevel(logging.DEBUG)
@@ -236,6 +239,18 @@ async def create_tool_config_list(agent_id, tenant_id, user_id):
                 "vdb_core": get_vector_db_core(),
                 "embedding_model": get_embedding_model(tenant_id=tenant_id),
             }
+        elif tool_config.class_name == "AnalyzeTextFileTool":
+            tool_config.metadata = {
+                "llm_model": get_llm_model(tenant_id=tenant_id),
+                "storage_client": minio_client,
+                "data_process_service_url": DATA_PROCESS_SERVICE
+            }
+        elif tool_config.class_name == "AnalyzeImageTool":
+            tool_config.metadata = {
+                "vlm_model": get_vlm_model(tenant_id=tenant_id),
+                "storage_client": minio_client,
+            }
+
         tool_config_list.append(tool_config)
 
     return tool_config_list
@@ -299,13 +314,12 @@ async def join_minio_file_description_to_query(minio_files, query):
     if minio_files and isinstance(minio_files, list):
         file_descriptions = []
         for file in minio_files:
-            if isinstance(file, dict) and "description" in file and file["description"]:
-                file_descriptions.append(file["description"])
-
+            if isinstance(file, dict) and "url" in file and file["url"] and "name" in file and file["name"]:
+                file_descriptions.append(f"File name: {file['name']}, S3 URL: s3:/{file['url']}")
         if file_descriptions:
-            final_query = "User provided some reference files:\n"
+            final_query = "User uploaded files. The file information is as follows:\n"
             final_query += "\n".join(file_descriptions) + "\n\n"
-            final_query += f"User wants to answer questions based on the above information: {query}"
+            final_query += f"User wants to answer questions based on the information in the above files: {query}"
     return final_query
 
 

@@ -9,7 +9,7 @@ import os
 import sys
 import types
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock, AsyncMock, Mock
 from pathlib import Path
 from io import BytesIO
 
@@ -73,10 +73,6 @@ get_file_url_impl = file_management_service.get_file_url_impl
 get_file_stream_impl = file_management_service.get_file_stream_impl
 delete_file_impl = file_management_service.delete_file_impl
 list_files_impl = file_management_service.list_files_impl
-preprocess_files_generator = file_management_service.preprocess_files_generator
-process_image_file = file_management_service.process_image_file
-process_text_file = file_management_service.process_text_file
-get_file_description = file_management_service.get_file_description
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_patches():
@@ -703,446 +699,6 @@ class TestListFilesImpl:
             mock_list.assert_called_once_with(prefix="folder/")
 
 
-class TestProcessImageFile:
-    """Test cases for process_image_file function"""
-
-    @pytest.mark.asyncio
-    async def test_process_image_file_success(self):
-        """Test successful image file processing"""
-        with patch('backend.services.file_management_service.convert_image_to_text', return_value="Extracted text from image") as mock_convert:
-            # Execute
-            result = await process_image_file(
-                query="Test query",
-                filename="test.jpg",
-                file_content=b"image binary data",
-                tenant_id="tenant123",
-                language="en"
-            )
-
-            # Assertions
-            assert "Image file test.jpg content" in result
-            assert "Extracted text from image" in result
-            mock_convert.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_process_image_file_with_error(self):
-        """Test image file processing with error"""
-        with patch('backend.services.file_management_service.convert_image_to_text', side_effect=Exception("Processing failed")) as mock_convert:
-            # Execute
-            result = await process_image_file(
-                query="Test query",
-                filename="test.jpg",
-                file_content=b"image binary data",
-                tenant_id="tenant123",
-                language="zh"
-            )
-
-            # Assertions - expect Chinese messages since language="zh"
-            assert "图片文件 test.jpg 内容" in result
-            assert "处理图片文件 test.jpg 时出错: Processing failed" in result
-            mock_convert.assert_called_once()
-
-
-class TestProcessTextFile:
-    """Test cases for process_text_file function"""
-
-    @pytest.mark.asyncio
-    async def test_process_text_file_success(self):
-        """Test successful text file processing"""
-        # Mock the HTTP response from the data processing service
-        mock_response_data = {"text": "Raw text content from API"}
-        
-        with patch('httpx.AsyncClient.post') as mock_post, \
-             patch('backend.services.file_management_service.convert_long_text_to_text', return_value=("Processed text content", "0")) as mock_convert:
-            
-            # Mock the HTTP response
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = mock_response_data
-            mock_post.return_value = mock_response
-            
-            # Execute
-            result, truncation_percentage = await process_text_file(
-                query="Test query",
-                filename="test.txt",
-                file_content=b"test file content",
-                tenant_id="tenant123",
-                language="en"
-            )
-
-            # Assertions
-            assert "File test.txt content" in result
-            assert "Processed text content" in result
-            assert truncation_percentage == "0"
-            mock_convert.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_process_text_file_with_error(self):
-        """Test text file processing with error"""
-        # Mock the HTTP response from the data processing service
-        mock_response_data = {"text": "Raw text content from API"}
-        
-        with patch('httpx.AsyncClient.post') as mock_post, \
-             patch('backend.services.file_management_service.convert_long_text_to_text', side_effect=Exception("Processing failed")) as mock_convert:
-            
-            # Mock the HTTP response
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = mock_response_data
-            mock_post.return_value = mock_response
-            
-            # Execute
-            result, truncation_percentage = await process_text_file(
-                query="Test query",
-                filename="test.txt",
-                file_content=b"test file content",
-                tenant_id="tenant123",
-                language="zh"
-            )
-
-            # Assertions - expect Chinese messages since language="zh"
-            assert "文件 test.txt 内容" in result
-            assert "处理文本文件 test.txt 时出错: Processing failed" in result
-            assert truncation_percentage is None
-            mock_convert.assert_called_once()
-
-
-class TestGetFileDescription:
-    """Test cases for get_file_description function"""
-
-    def test_get_file_description_with_files(self):
-        """Test file description generation with files"""
-        # Create mock UploadFile objects
-        text_file = MagicMock()
-        text_file.filename = "document.txt"
-
-        image_file = MagicMock()
-        image_file.filename = "photo.jpg"
-
-        # Execute
-        result = get_file_description([text_file, image_file])
-
-        # Assertions
-        assert "User provided some reference files" in result
-        assert "Image file photo.jpg" in result
-        assert "File document.txt" in result
-
-    def test_get_file_description_empty_list(self):
-        """Test file description generation with empty file list"""
-        # Execute
-        result = get_file_description([])
-
-        # Assertions
-        assert "User provided some reference files" in result
-        assert "No files provided" in result
-
-
-class TestPreprocessFilesGenerator:
-    """Test cases for preprocess_files_generator function"""
-
-    @pytest.mark.asyncio
-    async def test_preprocess_files_generator_success(self):
-        """Test successful file preprocessing generator"""
-        file_cache = [
-            {
-                "filename": "test.txt",
-                "content": b"test content",
-                "ext": ".txt"
-            },
-            {
-                "filename": "test.jpg",
-                "content": b"image data",
-                "ext": ".jpg"
-            }
-        ]
-
-        with patch('backend.services.file_management_service.process_text_file', AsyncMock(return_value=("Processed text", None))) as mock_process_text, \
-             patch('backend.services.file_management_service.process_image_file', AsyncMock(return_value="Processed image")) as mock_process_image, \
-             patch('backend.services.file_management_service.preprocess_manager') as mock_preprocess_manager:
-
-            # Mock preprocess manager
-            mock_preprocess_manager.register_preprocess_task = MagicMock()
-            mock_preprocess_manager.unregister_preprocess_task = MagicMock()
-
-            # Execute
-            results = []
-            async for result in preprocess_files_generator(
-                query="Test query",
-                file_cache=file_cache,
-                tenant_id="tenant123",
-                language="en",
-                task_id="task123",
-                conversation_id=1
-            ):
-                results.append(result)
-
-            # Assertions
-            assert len(results) > 0
-            mock_process_text.assert_called_once()
-            mock_process_image.assert_called_once()
-            mock_preprocess_manager.register_preprocess_task.assert_called_once()
-            mock_preprocess_manager.unregister_preprocess_task.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_preprocess_files_generator_with_errors(self):
-        """Test file preprocessing generator with processing errors"""
-        file_cache = [
-            {
-                "filename": "test.txt",
-                "content": b"test content",
-                "ext": ".txt"
-            }
-        ]
-
-        with patch('backend.services.file_management_service.process_text_file', AsyncMock(side_effect=Exception("Processing failed"))) as mock_process_text, \
-             patch('backend.services.file_management_service.preprocess_manager') as mock_preprocess_manager:
-
-            # Mock preprocess manager
-            mock_preprocess_manager.register_preprocess_task = MagicMock()
-            mock_preprocess_manager.unregister_preprocess_task = MagicMock()
-
-            # Execute
-            results = []
-            async for result in preprocess_files_generator(
-                query="Test query",
-                file_cache=file_cache,
-                tenant_id="tenant123",
-                language="en",
-                task_id="task123",
-                conversation_id=1
-            ):
-                results.append(result)
-
-            # Assertions
-            assert len(results) > 0
-            mock_process_text.assert_called_once()
-            mock_preprocess_manager.register_preprocess_task.assert_called_once()
-            mock_preprocess_manager.unregister_preprocess_task.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_preprocess_files_generator_with_truncation(self):
-        """Test file preprocessing generator with file truncation"""
-        file_cache = [
-            {
-                "filename": "test.txt",
-                "content": b"test content",
-                "ext": ".txt"
-            }
-        ]
-
-        with patch('backend.services.file_management_service.process_text_file', AsyncMock(return_value=("Processed text", "50"))) as mock_process_text, \
-             patch('backend.services.file_management_service.preprocess_manager') as mock_preprocess_manager:
-
-            # Mock preprocess manager
-            mock_preprocess_manager.register_preprocess_task = MagicMock()
-            mock_preprocess_manager.unregister_preprocess_task = MagicMock()
-
-            # Execute
-            results = []
-            async for result in preprocess_files_generator(
-                query="Test query",
-                file_cache=file_cache,
-                tenant_id="tenant123",
-                language="en",
-                task_id="task123",
-                conversation_id=1
-            ):
-                results.append(result)
-
-            # Assertions
-            assert len(results) > 0
-            mock_process_text.assert_called_once()
-            mock_preprocess_manager.register_preprocess_task.assert_called_once()
-            mock_preprocess_manager.unregister_preprocess_task.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_preprocess_files_generator_with_zero_truncation(self):
-        """Test file preprocessing generator with zero truncation percentage"""
-        file_cache = [
-            {
-                "filename": "test.txt",
-                "content": b"test content",
-                "ext": ".txt"
-            }
-        ]
-
-        with patch('backend.services.file_management_service.process_text_file', AsyncMock(return_value=("Processed text", "0"))) as mock_process_text, \
-             patch('backend.services.file_management_service.preprocess_manager') as mock_preprocess_manager:
-
-            # Mock preprocess manager
-            mock_preprocess_manager.register_preprocess_task = MagicMock()
-            mock_preprocess_manager.unregister_preprocess_task = MagicMock()
-
-            # Execute
-            results = []
-            async for result in preprocess_files_generator(
-                query="Test query",
-                file_cache=file_cache,
-                tenant_id="tenant123",
-                language="en",
-                task_id="task123",
-                conversation_id=1
-            ):
-                results.append(result)
-
-            # Assertions
-            assert len(results) > 0
-            mock_process_text.assert_called_once()
-            mock_preprocess_manager.register_preprocess_task.assert_called_once()
-            mock_preprocess_manager.unregister_preprocess_task.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_preprocess_files_generator_with_file_error(self):
-        """Test file preprocessing generator with file that has error in cache"""
-        file_cache = [
-            {
-                "filename": "test.txt",
-                "content": b"test content",
-                "ext": ".txt",
-                "error": "File corrupted"
-            }
-        ]
-
-        with patch('backend.services.file_management_service.preprocess_manager') as mock_preprocess_manager:
-
-            # Mock preprocess manager
-            mock_preprocess_manager.register_preprocess_task = MagicMock()
-            mock_preprocess_manager.unregister_preprocess_task = MagicMock()
-
-            # Execute
-            results = []
-            async for result in preprocess_files_generator(
-                query="Test query",
-                file_cache=file_cache,
-                tenant_id="tenant123",
-                language="en",
-                task_id="task123",
-                conversation_id=1
-            ):
-                results.append(result)
-
-            # Assertions
-            assert len(results) > 0
-            mock_preprocess_manager.register_preprocess_task.assert_called_once()
-            mock_preprocess_manager.unregister_preprocess_task.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_preprocess_files_generator_empty_cache(self):
-        """Test file preprocessing generator with empty file cache"""
-        file_cache = []
-
-        with patch('backend.services.file_management_service.preprocess_manager') as mock_preprocess_manager:
-
-            # Mock preprocess manager
-            mock_preprocess_manager.register_preprocess_task = MagicMock()
-            mock_preprocess_manager.unregister_preprocess_task = MagicMock()
-
-            # Execute
-            results = []
-            async for result in preprocess_files_generator(
-                query="Test query",
-                file_cache=file_cache,
-                tenant_id="tenant123",
-                language="en",
-                task_id="task123",
-                conversation_id=1
-            ):
-                results.append(result)
-
-            # Assertions
-            assert len(results) > 0  # Should still yield completion message
-            mock_preprocess_manager.register_preprocess_task.assert_called_once()
-            mock_preprocess_manager.unregister_preprocess_task.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_preprocess_files_generator_task_cancellation(self):
-        """Test file preprocessing generator with task cancellation"""
-        file_cache = [
-            {
-                "filename": "test.txt",
-                "content": b"test content",
-                "ext": ".txt"
-            }
-        ]
-
-        with patch('backend.services.file_management_service.preprocess_manager') as mock_preprocess_manager:
-
-            # Mock preprocess manager
-            mock_preprocess_manager.register_preprocess_task = MagicMock()
-            mock_preprocess_manager.unregister_preprocess_task = MagicMock()
-
-            # Mock current task to be done (cancelled)
-            mock_task = MagicMock()
-            mock_task.done.return_value = True
-            with patch('asyncio.current_task', return_value=mock_task):
-                # Execute
-                results = []
-                async for result in preprocess_files_generator(
-                    query="Test query",
-                    file_cache=file_cache,
-                    tenant_id="tenant123",
-                    language="en",
-                    task_id="task123",
-                    conversation_id=1
-                ):
-                    results.append(result)
-
-                # Assertions
-                assert len(results) > 0
-                mock_preprocess_manager.register_preprocess_task.assert_called_once()
-                mock_preprocess_manager.unregister_preprocess_task.assert_called_once()
-
-
-class TestUtilityFunctions:
-    """Test cases for utility functions"""
-
-    def test_get_parsing_file_data(self):
-        """Test get_parsing_file_data function returns correct structure"""
-        from backend.services.file_management_service import get_parsing_file_data
-        
-        result = get_parsing_file_data(0, 3, "test.txt")
-        expected = {
-            "params": {
-                "index": 1,
-                "total": 3,
-                "filename": "test.txt"
-            }
-        }
-        assert result == expected
-        
-        result = get_parsing_file_data(2, 5, "document.pdf")
-        expected = {
-            "params": {
-                "index": 3,
-                "total": 5,
-                "filename": "document.pdf"
-            }
-        }
-        assert result == expected
-
-    def test_get_truncation_data(self):
-        """Test get_truncation_data function returns correct structure"""
-        from backend.services.file_management_service import get_truncation_data
-        
-        result = get_truncation_data("test.txt", 50)
-        expected = {
-            "params": {
-                "filename": "test.txt",
-                "percentage": 50
-            }
-        }
-        assert result == expected
-        
-        result = get_truncation_data("document.pdf", 25)
-        expected = {
-            "params": {
-                "filename": "document.pdf",
-                "percentage": 25
-            }
-        }
-        assert result == expected
-
-
 class TestEdgeCasesAndErrorHandling:
     """Test cases for edge cases and error handling scenarios"""
 
@@ -1187,123 +743,6 @@ class TestEdgeCasesAndErrorHandling:
 
         # Assertions
         assert results == []
-
-    @pytest.mark.asyncio
-    async def test_process_text_file_http_error_response(self):
-        """Test process_text_file with HTTP error response"""
-        # Mock the HTTP response with error status
-        mock_response_data = {"detail": "File processing failed"}
-        
-        with patch('httpx.AsyncClient.post') as mock_post:
-            # Mock the HTTP response with error status
-            mock_response = MagicMock()
-            mock_response.status_code = 400
-            mock_response.headers = {"content-type": "application/json"}
-            mock_response.json.return_value = mock_response_data
-            mock_post.return_value = mock_response
-            
-            # Execute
-            result, truncation_percentage = await process_text_file(
-                query="Test query",
-                filename="test.txt",
-                file_content=b"test file content",
-                tenant_id="tenant123",
-                language="en"
-            )
-
-            # Assertions
-            assert "Error processing text file test.txt" in result
-            assert "File processing failed (status code: 400)" in result
-            assert truncation_percentage is None
-
-    @pytest.mark.asyncio
-    async def test_process_text_file_http_error_non_json_response(self):
-        """Test process_text_file with HTTP error response that's not JSON"""
-        with patch('httpx.AsyncClient.post') as mock_post:
-            # Mock the HTTP response with error status and non-JSON content
-            mock_response = MagicMock()
-            mock_response.status_code = 500
-            mock_response.headers = {"content-type": "text/plain"}
-            mock_response.text = "Internal Server Error"
-            mock_post.return_value = mock_response
-            
-            # Execute
-            result, truncation_percentage = await process_text_file(
-                query="Test query",
-                filename="test.txt",
-                file_content=b"test file content",
-                tenant_id="tenant123",
-                language="en"
-            )
-
-            # Assertions
-            assert "Error processing text file test.txt" in result
-            assert "File processing failed (status code: 500)" in result
-            assert truncation_percentage is None
-
-    @pytest.mark.asyncio
-    async def test_process_text_file_json_decode_error(self):
-        """Test process_text_file with JSON decode error"""
-        with patch('httpx.AsyncClient.post') as mock_post:
-            # Mock the HTTP response with invalid JSON
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.side_effect = ValueError("Invalid JSON")
-            mock_post.return_value = mock_response
-            
-            # Execute
-            result, truncation_percentage = await process_text_file(
-                query="Test query",
-                filename="test.txt",
-                file_content=b"test file content",
-                tenant_id="tenant123",
-                language="en"
-            )
-
-            # Assertions
-            assert "Error processing text file test.txt" in result
-            assert "Invalid JSON" in result
-            assert truncation_percentage is None
-
-    def test_get_file_description_with_none_filename(self):
-        """Test get_file_description with file having None filename"""
-        # Create mock UploadFile with None filename
-        mock_file = MagicMock()
-        mock_file.filename = None
-
-        # Execute
-        result = get_file_description([mock_file])
-
-        # Assertions
-        assert "User provided some reference files" in result
-        assert "File " in result  # Should handle None filename gracefully
-
-    def test_get_file_description_with_various_file_types(self):
-        """Test get_file_description with various file types"""
-        # Create mock UploadFiles with different extensions
-        image_files = [
-            MagicMock(filename="test.jpg"),
-            MagicMock(filename="test.jpeg"),
-            MagicMock(filename="test.png"),
-            MagicMock(filename="test.gif"),
-            MagicMock(filename="test.bmp")
-        ]
-        
-        text_files = [
-            MagicMock(filename="test.txt"),
-            MagicMock(filename="test.pdf"),
-            MagicMock(filename="test.docx")
-        ]
-
-        # Execute
-        result = get_file_description(image_files + text_files)
-
-        # Assertions
-        assert "User provided some reference files" in result
-        for file in image_files:
-            assert f"Image file {file.filename}" in result
-        for file in text_files:
-            assert f"File {file.filename}" in result
 
     @pytest.mark.asyncio
     async def test_list_files_impl_with_none_limit(self):
@@ -1402,141 +841,6 @@ class TestConcurrencyAndFileTypes:
             mock_semaphore.__aexit__.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_preprocess_files_generator_different_file_types(self):
-        """Test preprocess_files_generator with different file types"""
-        file_cache = [
-            {
-                "filename": "test.txt",
-                "content": b"test content",
-                "ext": ".txt"
-            },
-            {
-                "filename": "test.jpg",
-                "content": b"image data",
-                "ext": ".jpg"
-            },
-            {
-                "filename": "test.jpeg",
-                "content": b"image data",
-                "ext": ".jpeg"
-            },
-            {
-                "filename": "test.png",
-                "content": b"image data",
-                "ext": ".png"
-            },
-            {
-                "filename": "test.gif",
-                "content": b"image data",
-                "ext": ".gif"
-            },
-            {
-                "filename": "test.bmp",
-                "content": b"image data",
-                "ext": ".bmp"
-            },
-            {
-                "filename": "test.webp",
-                "content": b"image data",
-                "ext": ".webp"
-            },
-            {
-                "filename": "test.pdf",
-                "content": b"pdf data",
-                "ext": ".pdf"
-            }
-        ]
-
-        with patch('backend.services.file_management_service.process_text_file', AsyncMock(return_value=("Processed text", None))) as mock_process_text, \
-             patch('backend.services.file_management_service.process_image_file', AsyncMock(return_value="Processed image")) as mock_process_image, \
-             patch('backend.services.file_management_service.preprocess_manager') as mock_preprocess_manager:
-
-            # Mock preprocess manager
-            mock_preprocess_manager.register_preprocess_task = MagicMock()
-            mock_preprocess_manager.unregister_preprocess_task = MagicMock()
-
-            # Execute
-            results = []
-            async for result in preprocess_files_generator(
-                query="Test query",
-                file_cache=file_cache,
-                tenant_id="tenant123",
-                language="en",
-                task_id="task123",
-                conversation_id=1
-            ):
-                results.append(result)
-
-            # Assertions
-            assert len(results) > 0
-            # Should call process_text_file for .txt and .pdf files (2 calls)
-            assert mock_process_text.call_count == 2
-            # Should call process_image_file for image files (6 calls)
-            assert mock_process_image.call_count == 6
-            mock_preprocess_manager.register_preprocess_task.assert_called_once()
-            mock_preprocess_manager.unregister_preprocess_task.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_process_text_file_with_empty_response_text(self):
-        """Test process_text_file with empty text in response"""
-        # Mock the HTTP response with empty text
-        mock_response_data = {"text": ""}
-        
-        with patch('httpx.AsyncClient.post') as mock_post, \
-             patch('backend.services.file_management_service.convert_long_text_to_text', return_value=("Processed text", "0")) as mock_convert:
-            
-            # Mock the HTTP response
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = mock_response_data
-            mock_post.return_value = mock_response
-            
-            # Execute
-            result, truncation_percentage = await process_text_file(
-                query="Test query",
-                filename="test.txt",
-                file_content=b"test file content",
-                tenant_id="tenant123",
-                language="en"
-            )
-
-            # Assertions
-            assert "File test.txt content" in result
-            assert "Processed text" in result
-            assert truncation_percentage == "0"
-            mock_convert.assert_called_once_with("Test query", "", "tenant123", "en")
-
-    @pytest.mark.asyncio
-    async def test_process_text_file_with_missing_text_in_response(self):
-        """Test process_text_file with missing text field in response"""
-        # Mock the HTTP response without text field
-        mock_response_data = {"status": "success"}
-        
-        with patch('httpx.AsyncClient.post') as mock_post, \
-             patch('backend.services.file_management_service.convert_long_text_to_text', return_value=("Processed text", "0")) as mock_convert:
-            
-            # Mock the HTTP response
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = mock_response_data
-            mock_post.return_value = mock_response
-            
-            # Execute
-            result, truncation_percentage = await process_text_file(
-                query="Test query",
-                filename="test.txt",
-                file_content=b"test file content",
-                tenant_id="tenant123",
-                language="en"
-            )
-
-            # Assertions
-            assert "File test.txt content" in result
-            assert "Processed text" in result
-            assert truncation_percentage == "0"
-            mock_convert.assert_called_once_with("Test query", "", "tenant123", "en")
-
-    @pytest.mark.asyncio
     async def test_upload_to_minio_with_none_folder(self):
         """Test upload_to_minio with None folder"""
         # Create mock UploadFile
@@ -1583,3 +887,130 @@ class TestConcurrencyAndFileTypes:
             # Verify that empty string was passed as prefix
             call_args = mock_upload.call_args
             assert call_args[1]["prefix"] == ""
+
+
+class TestGetLlmModel:
+    """Test cases for get_llm_model function"""
+
+    @patch('backend.services.file_management_service.MODEL_CONFIG_MAPPING', {"llm": "llm_config_key"})
+    @patch('backend.services.file_management_service.MessageObserver')
+    @patch('backend.services.file_management_service.OpenAILongContextModel')
+    @patch('backend.services.file_management_service.get_model_name_from_config')
+    @patch('backend.services.file_management_service.tenant_config_manager')
+    def test_get_llm_model_success(self, mock_tenant_config, mock_get_model_name, mock_openai_model, mock_message_observer):
+        """Test successful LLM model retrieval"""
+        from backend.services.file_management_service import get_llm_model
+
+        # Mock tenant config manager
+        mock_config = {
+            "base_url": "http://api.example.com",
+            "api_key": "test_api_key",
+            "max_tokens": 4096
+        }
+        mock_tenant_config.get_model_config.return_value = mock_config
+
+        # Mock model name
+        mock_get_model_name.return_value = "gpt-4"
+
+        # Mock MessageObserver
+        mock_observer_instance = Mock()
+        mock_message_observer.return_value = mock_observer_instance
+
+        # Mock OpenAILongContextModel
+        mock_model_instance = Mock()
+        mock_openai_model.return_value = mock_model_instance
+
+        # Execute
+        result = get_llm_model("tenant123")
+
+        # Assertions
+        assert result == mock_model_instance
+        mock_tenant_config.get_model_config.assert_called_once_with(
+            key="llm_config_key", tenant_id="tenant123")
+        mock_get_model_name.assert_called_once_with(mock_config)
+        mock_message_observer.assert_called_once()
+        mock_openai_model.assert_called_once_with(
+            observer=mock_observer_instance,
+            model_id="gpt-4",
+            api_base="http://api.example.com",
+            api_key="test_api_key",
+            max_context_tokens=4096
+        )
+
+    @patch('backend.services.file_management_service.MODEL_CONFIG_MAPPING', {"llm": "llm_config_key"})
+    @patch('backend.services.file_management_service.MessageObserver')
+    @patch('backend.services.file_management_service.OpenAILongContextModel')
+    @patch('backend.services.file_management_service.get_model_name_from_config')
+    @patch('backend.services.file_management_service.tenant_config_manager')
+    def test_get_llm_model_with_missing_config_values(self, mock_tenant_config, mock_get_model_name, mock_openai_model, mock_message_observer):
+        """Test get_llm_model with missing config values"""
+        from backend.services.file_management_service import get_llm_model
+
+        # Mock tenant config manager with missing values
+        mock_config = {
+            "base_url": "http://api.example.com"
+            # Missing api_key and max_tokens
+        }
+        mock_tenant_config.get_model_config.return_value = mock_config
+
+        # Mock model name
+        mock_get_model_name.return_value = "gpt-4"
+
+        # Mock MessageObserver
+        mock_observer_instance = Mock()
+        mock_message_observer.return_value = mock_observer_instance
+
+        # Mock OpenAILongContextModel
+        mock_model_instance = Mock()
+        mock_openai_model.return_value = mock_model_instance
+
+        # Execute
+        result = get_llm_model("tenant123")
+
+        # Assertions
+        assert result == mock_model_instance
+        # Verify that get() is used for missing values (returns None)
+        mock_openai_model.assert_called_once()
+        call_kwargs = mock_openai_model.call_args[1]
+        assert call_kwargs["api_key"] is None
+        assert call_kwargs["max_context_tokens"] is None
+
+    @patch('backend.services.file_management_service.MODEL_CONFIG_MAPPING', {"llm": "llm_config_key"})
+    @patch('backend.services.file_management_service.MessageObserver')
+    @patch('backend.services.file_management_service.OpenAILongContextModel')
+    @patch('backend.services.file_management_service.get_model_name_from_config')
+    @patch('backend.services.file_management_service.tenant_config_manager')
+    def test_get_llm_model_with_different_tenant_ids(self, mock_tenant_config, mock_get_model_name, mock_openai_model, mock_message_observer):
+        """Test get_llm_model with different tenant IDs"""
+        from backend.services.file_management_service import get_llm_model
+
+        # Mock tenant config manager
+        mock_config = {
+            "base_url": "http://api.example.com",
+            "api_key": "test_api_key",
+            "max_tokens": 4096
+        }
+        mock_tenant_config.get_model_config.return_value = mock_config
+
+        # Mock model name
+        mock_get_model_name.return_value = "gpt-4"
+
+        # Mock MessageObserver
+        mock_observer_instance = Mock()
+        mock_message_observer.return_value = mock_observer_instance
+
+        # Mock OpenAILongContextModel
+        mock_model_instance = Mock()
+        mock_openai_model.return_value = mock_model_instance
+
+        # Execute with different tenant IDs
+        result1 = get_llm_model("tenant1")
+        result2 = get_llm_model("tenant2")
+
+        # Assertions
+        assert result1 == mock_model_instance
+        assert result2 == mock_model_instance
+        # Verify tenant config was called with different tenant IDs
+        assert mock_tenant_config.get_model_config.call_count == 2
+        assert mock_tenant_config.get_model_config.call_args_list[0][1]["tenant_id"] == "tenant1"
+        assert mock_tenant_config.get_model_config.call_args_list[1][1]["tenant_id"] == "tenant2"

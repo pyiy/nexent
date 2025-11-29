@@ -18,10 +18,11 @@ os.environ.setdefault('MINIO_SECRET_KEY', 'minioadmin')
 os.environ.setdefault('MINIO_REGION', 'us-east-1')
 os.environ.setdefault('MINIO_DEFAULT_BUCKET', 'test-bucket')
 
-# Mock boto3 before importing the module under test
+# Mock boto3 and dotenv before importing the module under test
 boto3_mock = MagicMock()
 minio_client_mock = MagicMock()
 sys.modules['boto3'] = boto3_mock
+sys.modules['dotenv'] = MagicMock(load_dotenv=MagicMock())
 
 # Mock nexent modules before importing modules that use them
 nexent_mock = MagicMock()
@@ -36,6 +37,41 @@ sys.modules['nexent.vector_database.elasticsearch_core'] = MagicMock()
 sys.modules['nexent.core.agents'] = MagicMock()
 sys.modules['nexent.core.agents.agent_model'] = MagicMock()
 sys.modules['nexent.storage.storage_client_factory'] = MagicMock()
+
+# Stub nexent.core.models.* required by attachment_utils
+nexent_core_models_pkg = types.ModuleType("nexent.core.models")
+nexent_core_models_pkg.__path__ = []  # Mark as package for submodule imports
+sys.modules["nexent.core.models"] = nexent_core_models_pkg
+
+openai_long_ctx_mod = types.ModuleType(
+    "nexent.core.models.openai_long_context_model"
+)
+
+
+class OpenAILongContextModel:
+    def __init__(self, *args, **kwargs):
+        pass
+
+
+openai_long_ctx_mod.OpenAILongContextModel = OpenAILongContextModel
+sys.modules[
+    "nexent.core.models.openai_long_context_model"
+] = openai_long_ctx_mod
+# Also expose on the package for `from nexent.core.models import OpenAILongContextModel`
+nexent_core_models_pkg.OpenAILongContextModel = OpenAILongContextModel
+
+openai_vlm_mod = types.ModuleType("nexent.core.models.openai_vlm")
+
+
+class OpenAIVLModel:
+    def __init__(self, *args, **kwargs):
+        pass
+
+
+openai_vlm_mod.OpenAIVLModel = OpenAIVLModel
+sys.modules["nexent.core.models.openai_vlm"] = openai_vlm_mod
+# Also expose on the package for potential direct imports
+nexent_core_models_pkg.OpenAIVLModel = OpenAIVLModel
 
 # Patch storage factory and MinIO config validation to avoid errors during initialization
 # These patches must be started before any imports that use MinioClient

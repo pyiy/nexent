@@ -12,6 +12,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 // @ts-ignore
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { visit } from "unist-util-visit";
 
 import { SearchResult } from "@/types/chat";
 import {
@@ -52,6 +53,47 @@ const isVideoUrl = (url?: string): boolean => {
 
   const extension = extractExtension(trimmed);
   return VIDEO_EXTENSIONS.includes(extension);
+};
+
+// extract block level elements from <p>
+const rehypeUnwrapMedia = () => {
+  return (tree: any) => {
+    visit(tree, "element", (node, index, parent) => {
+      // find <p> tags containing video or figure
+      if (node.tagName === "p" && node.children) {
+        const mediaChildIndex = node.children.findIndex(
+          (child: any) =>
+            child.tagName === "video" || child.tagName === "figure"
+        );
+
+        if (mediaChildIndex !== -1) {
+          // extract media elements (video/figure)
+          const mediaChild = node.children.splice(mediaChildIndex, 1)[0];
+          
+          // if <p> has other content after extraction, keep <p>; otherwise remove empty <p>
+          if (node.children.length === 0) {
+            // replace original <p> node with media element
+            if (parent && index !== null) {
+              parent.children[index as number] = {
+                tagName: "div",
+                properties: { className: "markdown-media-container" },
+                children: [mediaChild],
+              };
+            }
+          } else {
+            // if <p> has other content after extraction, keep <p>; otherwise remove empty <p>
+            if (parent && index !== null) {
+              parent.children.splice((index as number) + 1, 0, {
+                tagName: "div",
+                properties: { className: "markdown-media-container" },
+                children: [mediaChild],
+              });
+            }
+          }
+        }
+      }
+    });
+  };
 };
 
 // Get background color for different tool signs
@@ -381,6 +423,102 @@ const convertLatexDelimiters = (content: string): string => {
   );
 };
 
+// Video component with error handling - defined outside to prevent re-creation on each render
+interface VideoWithErrorHandlingProps {
+  src: string;
+  alt?: string | null;
+  props?: React.VideoHTMLAttributes<HTMLVideoElement>;
+}
+
+const VideoWithErrorHandling: React.FC<VideoWithErrorHandlingProps> = React.memo(({ src, alt, props = {} }) => {
+  const { t } = useTranslation("common");
+  const [hasError, setHasError] = React.useState(false);
+
+  if (hasError) {
+    return (
+      <div className="markdown-media-error">
+        <div className="markdown-media-error-message">
+          {t("chatStreamMessage.videoLinkUnavailable", {
+            defaultValue: "This video link is unavailable",
+          })}
+        </div>
+        {alt && (
+          <div className="markdown-media-error-caption">{alt}</div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <figure className="markdown-video-wrapper">
+      <video
+        className="markdown-video"
+        controls
+        preload="metadata"
+        playsInline
+        src={src}
+        onError={() => setHasError(true)}
+        {...props}
+      >
+        {t("chatStreamMessage.videoNotSupported", {
+          defaultValue: "Sorry, your browser does not support embedded videos.",
+        })}
+      </video>
+      {alt ? (
+        <figcaption className="markdown-video-caption">{alt}</figcaption>
+      ) : null}
+    </figure>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  // Only compare src and alt, props object reference may change but content is the same
+  return prevProps.src === nextProps.src && 
+         prevProps.alt === nextProps.alt;
+});
+
+VideoWithErrorHandling.displayName = "VideoWithErrorHandling";
+
+// Image component with error handling - defined outside to prevent re-creation on each render
+interface ImageWithErrorHandlingProps {
+  src: string;
+  alt?: string | null;
+}
+
+const ImageWithErrorHandling: React.FC<ImageWithErrorHandlingProps> = React.memo(({ src, alt }) => {
+  const { t } = useTranslation("common");
+  const [hasError, setHasError] = React.useState(false);
+
+  if (hasError) {
+    return (
+      <div className="markdown-media-error">
+        <div className="markdown-media-error-message">
+          {t("chatStreamMessage.imageLinkUnavailable", {
+            defaultValue: "This image link is unavailable",
+          })}
+        </div>
+        {alt && (
+          <div className="markdown-media-error-caption">{alt}</div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt ?? undefined}
+      className="markdown-img"
+      onError={() => setHasError(true)}
+    />
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  return prevProps.src === nextProps.src && 
+         prevProps.alt === nextProps.alt;
+});
+
+ImageWithErrorHandling.displayName = "ImageWithErrorHandling";
+
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   className,
@@ -475,25 +613,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       return renderMediaFallback(src, alt);
     }
 
-    return (
-      <figure className="markdown-video-wrapper">
-        <video
-          className="markdown-video"
-          controls
-          preload="metadata"
-          playsInline
-          src={src}
-          {...props}
-        >
-          {t("chatStreamMessage.videoNotSupported", {
-            defaultValue: "Sorry, your browser does not support embedded videos.",
-          })}
-        </video>
-        {alt ? (
-          <figcaption className="markdown-video-caption">{alt}</figcaption>
-        ) : null}
-      </figure>
-    );
+    return <VideoWithErrorHandling key={src} src={src} alt={alt} props={props} />;
   };
 
   // Modified processText function logic
@@ -612,6 +732,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             remarkPlugins={[remarkGfm, remarkMath] as any}
             rehypePlugins={
               [
+                rehypeUnwrapMedia,
                 [
                   rehypeKatex,
                   {
@@ -786,7 +907,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   </code>
                 );
               },
-              // Image (also handles video previews emitted as image markdown)
+              // Image
               img: ({ src, alt }: any) => {
                 if (!enableMultimodal) {
                   return renderMediaFallback(src, alt);
@@ -796,8 +917,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   return renderVideoElement({ src, alt });
                 }
 
-                return <img src={src} alt={alt} className="markdown-img" />;
+                if (!src || typeof src !== "string") {
+                  return null;
+                }
+
+                return <ImageWithErrorHandling key={src} src={src} alt={alt} />;
               },
+              // Video
               video: ({ children, ...props }: any) => {
                 const directSrc = props?.src;
                 const childSource = React.Children.toArray(children)
@@ -829,5 +955,3 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     </>
   );
 };
-
-    

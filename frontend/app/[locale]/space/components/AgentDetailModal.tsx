@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { generateAvatarFromName } from "@/lib/avatar";
+import { getToolSourceLabel, getCategoryLabel } from "@/lib/agentLabelMapper";
 
 interface AgentDetailModalProps {
   visible: boolean;
@@ -206,17 +207,17 @@ export default function AgentDetailModal({
                 <div className="flex gap-2 flex-wrap">
                   {tool.source && (
                     <Tag color="blue">
-                      {t("space.detail.source", "Source")}: {tool.source}
+                      {t("common.source", "Source")}: {getToolSourceLabel(tool.source, t)}
                     </Tag>
                   )}
                   {tool.category && (
                     <Tag color="purple">
-                      {t("space.detail.category", "Category")}: {tool.category}
+                      {t("common.category", "Category")}: {getCategoryLabel(tool.category, t)}
                     </Tag>
                   )}
                   {tool.usage && (
                     <Tag color="green">
-                      {t("space.detail.usage", "Usage")}: {tool.usage}
+                      {t("common.usage", "Usage")}: {tool.usage}
                     </Tag>
                   )}
                 </div>

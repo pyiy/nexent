@@ -736,6 +736,94 @@ class ElasticSearchCore(VectorDatabaseCore):
             "page_size": result_page_size,
         }
 
+    def create_chunk(self, index_name: str, chunk: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create a single chunk document.
+        """
+        try:
+            payload = chunk.copy()
+            document_id = payload.get("id")
+            response = self.client.index(
+                index=index_name,
+                id=document_id,
+                document=payload,
+                refresh="wait_for",
+            )
+            logger.info(
+                "Created chunk %s in index %s", response.get("_id"), index_name
+            )
+            return {
+                "id": response.get("_id"),
+                "result": response.get("result"),
+                "version": response.get("_version"),
+            }
+        except Exception as exc:
+            logger.error(
+                "Error creating chunk in index %s: %s", index_name, exc, exc_info=True
+            )
+            raise
+
+    def update_chunk(self, index_name: str, chunk_id: str, chunk_updates: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update an existing chunk document.
+        """
+        try:
+            document_id = self._resolve_chunk_document_id(index_name, chunk_id)
+            response = self.client.update(
+                index=index_name,
+                id=document_id,
+                body={"doc": chunk_updates},
+                refresh="wait_for",
+                retry_on_conflict=3,
+            )
+            logger.info(
+                "Updated chunk %s in index %s", document_id, index_name
+            )
+            return {
+                "id": response.get("_id"),
+                "result": response.get("result"),
+                "version": response.get("_version"),
+            }
+        except Exception as exc:
+            logger.error(
+                "Error updating chunk %s in index %s: %s",
+                chunk_id,
+                index_name,
+                exc,
+                exc_info=True,
+            )
+            raise
+
+    def delete_chunk(self, index_name: str, chunk_id: str) -> bool:
+        """
+        Delete a chunk document by id.
+        """
+        try:
+            document_id = self._resolve_chunk_document_id(index_name, chunk_id)
+            response = self.client.delete(
+                index=index_name,
+                id=document_id,
+                refresh="wait_for",
+            )
+            logger.info(
+                "Deleted chunk %s in index %s", document_id, index_name
+            )
+            return response.get("result") == "deleted"
+        except exceptions.NotFoundError:
+            logger.warning(
+                "Chunk %s not found in index %s", chunk_id, index_name
+            )
+            return False
+        except Exception as exc:
+            logger.error(
+                "Error deleting chunk %s in index %s: %s",
+                chunk_id,
+                index_name,
+                exc,
+                exc_info=True,
+            )
+            raise
+
     def search(self, index_name: str, query: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute a search query on an index.
@@ -1058,3 +1146,32 @@ class ElasticSearchCore(VectorDatabaseCore):
                 all_stats[index_name] = {"error": str(e)}
 
         return all_stats
+
+    def _resolve_chunk_document_id(self, index_name: str, chunk_id: str) -> str:
+        """
+        Resolve the Elasticsearch document id for a chunk.
+        """
+        try:
+            self.client.get(index=index_name, id=chunk_id, _source=False)
+            return chunk_id
+        except exceptions.NotFoundError:
+            pass
+
+        # Search by stored chunk id field
+        response = self.client.search(
+            index=index_name,
+            body={
+                "size": 1,
+                "query": {"term": {"id": {"value": chunk_id}}},
+                "_source": False,
+            },
+        )
+        hits = response.get("hits", {}).get("hits", [])
+        if hits:
+            return hits[0].get("_id")
+
+        raise exceptions.NotFoundError(
+            404,
+            {"error": {"reason": f"Chunk {chunk_id} not found in index {index_name}"}},
+            chunk_id,
+        )

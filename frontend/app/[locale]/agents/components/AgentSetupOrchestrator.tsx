@@ -4,20 +4,20 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { TFunction } from "i18next";
 
-import { App, Modal, Button } from "antd";
+import { App, Modal, Button, Tooltip } from "antd";
 import { WarningFilled } from "@ant-design/icons";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   fetchAgentList,
   updateAgent,
-  importAgent,
   deleteAgent,
   exportAgent,
   searchAgentInfo,
   searchToolConfig,
   updateToolConfig,
 } from "@/services/agentConfigService";
+import { useAgentImport } from "@/hooks/useAgentImport";
 import {
   Agent,
   AgentSetupOrchestratorProps,
@@ -98,6 +98,12 @@ export default function AgentSetupOrchestrator({
   const [toolConfigDrafts, setToolConfigDrafts] = useState<
     Record<string, ToolParam[]>
   >({});
+  const [pendingImportData, setPendingImportData] = useState<{
+    agentInfo: any;
+  } | null>(null);
+  const [importingAction, setImportingAction] = useState<
+    "force" | "regenerate" | null
+  >(null);
   // Use generation state passed from parent component, not local state
 
   // Delete confirmation popup status
@@ -494,7 +500,9 @@ export default function AgentSetupOrchestrator({
 
   const confirmOrRun = useCallback(
     (action: PendingAction) => {
-      if (hasUnsavedChanges) {
+      // In creation mode, always show save confirmation dialog when clicking debug
+      // Also show when there are unsaved changes
+      if ((isCreatingNewAgent && !isEditingAgent) || hasUnsavedChanges) {
         setPendingAction(() => action);
         setConfirmContext("switch");
         setIsSaveConfirmOpen(true);
@@ -502,7 +510,7 @@ export default function AgentSetupOrchestrator({
         void Promise.resolve(action());
       }
     },
-    [hasUnsavedChanges]
+    [hasUnsavedChanges, isCreatingNewAgent, isEditingAgent]
   );
 
   const handleToolConfigDraftSave = useCallback(
@@ -899,6 +907,8 @@ export default function AgentSetupOrchestrator({
     setSelectedTools([]);
     setEnabledToolIds([]);
     setEnabledAgentIds([]);
+    setToolConfigDrafts({});
+    setMainAgentId?.(null);
 
     // Clear business logic model to allow default from global settings
     // The useEffect in PromptManager will set it to the default from localStorage
@@ -909,6 +919,12 @@ export default function AgentSetupOrchestrator({
     // The useEffect in AgentConfigModal will set it to the default from localStorage
     setMainAgentModel(null);
     setMainAgentModelId(null);
+
+    try {
+      await onToolsRefresh?.(false);
+    } catch (error) {
+      log.error("Failed to refresh tools in creation mode:", error);
+    }
 
     onEditingStateChange?.(false, null);
   };
@@ -1525,6 +1541,54 @@ export default function AgentSetupOrchestrator({
     }
   };
 
+  // Use unified import hooks - one for normal import, one for force import
+  const { importFromData: runNormalImport } = useAgentImport({
+    onSuccess: () => {
+      message.success(t("businessLogic.config.error.agentImportSuccess"));
+      refreshAgentList(t, false);
+    },
+    onError: (error) => {
+      log.error(t("agentConfig.agents.importFailed"), error);
+      message.error(t("businessLogic.config.error.agentImportFailed"));
+    },
+    forceImport: false,
+  });
+
+  const { importFromData: runForceImport } = useAgentImport({
+    onSuccess: () => {
+      message.success(t("businessLogic.config.error.agentImportSuccess"));
+      refreshAgentList(t, false);
+    },
+    onError: (error) => {
+      log.error(t("agentConfig.agents.importFailed"), error);
+      message.error(t("businessLogic.config.error.agentImportFailed"));
+    },
+    forceImport: true,
+  });
+
+  const runAgentImport = useCallback(
+    async (
+      agentPayload: any,
+      translationFn: TFunction,
+      options?: { forceImport?: boolean }
+    ) => {
+      setIsImporting(true);
+      try {
+        if (options?.forceImport) {
+          await runForceImport(agentPayload);
+        } else {
+          await runNormalImport(agentPayload);
+        }
+        return true;
+      } catch (error) {
+        return false;
+      } finally {
+        setIsImporting(false);
+      }
+    },
+    [runNormalImport, runForceImport]
+  );
+
   // Handle importing agent
   const handleImportAgent = (t: TFunction) => {
     // Create a hidden file input element
@@ -1532,6 +1596,7 @@ export default function AgentSetupOrchestrator({
     fileInput.type = "file";
     fileInput.accept = ".json";
     fileInput.onchange = async (event) => {
+      setPendingImportData(null);
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
@@ -1541,7 +1606,6 @@ export default function AgentSetupOrchestrator({
         return;
       }
 
-      setIsImporting(true);
       try {
         // Read file content
         const fileContent = await file.text();
@@ -1551,32 +1615,116 @@ export default function AgentSetupOrchestrator({
           agentInfo = JSON.parse(fileContent);
         } catch (parseError) {
           message.error(t("businessLogic.config.error.invalidFileType"));
-          setIsImporting(false);
           return;
         }
 
-        // Call import API
-        const result = await importAgent(agentInfo);
+        const normalizeValue = (value?: string | null) =>
+          typeof value === "string" ? value.trim() : "";
 
-        if (result.success) {
-          message.success(t("businessLogic.config.error.agentImportSuccess"));
-          // Refresh agent list
-          refreshAgentList(t);
+        const extractImportedAgents = (data: any): any[] => {
+          if (!data) {
+            return [];
+          }
+
+          if (Array.isArray(data)) {
+            return data;
+          }
+
+          if (data.agent_info && typeof data.agent_info === "object") {
+            return Object.values(data.agent_info).filter(
+              (item) => item && typeof item === "object"
+            );
+          }
+
+          if (data.agentInfo && typeof data.agentInfo === "object") {
+            return Object.values(data.agentInfo).filter(
+              (item) => item && typeof item === "object"
+            );
+          }
+
+          return [data];
+        };
+
+        const importedAgents = extractImportedAgents(agentInfo);
+        const agentList = Array.isArray(subAgentList) ? subAgentList : [];
+
+        const existingNames = new Set(
+          agentList
+            .map((agent) => normalizeValue(agent?.name))
+            .filter((name) => !!name)
+        );
+        const existingDisplayNames = new Set(
+          agentList
+            .map((agent) => normalizeValue(agent?.display_name))
+            .filter((name) => !!name)
+        );
+
+        const duplicateNames = Array.from(
+          new Set(
+            importedAgents
+              .map((agent) => normalizeValue(agent?.name))
+              .filter(
+                (name) => name && existingNames.has(name)
+              ) as string[]
+          )
+        );
+        const duplicateDisplayNames = Array.from(
+          new Set(
+            importedAgents
+              .map((agent) =>
+                normalizeValue(agent?.display_name ?? agent?.displayName)
+              )
+              .filter(
+                (displayName) =>
+                  displayName && existingDisplayNames.has(displayName)
+              ) as string[]
+          )
+        );
+
+        const hasNameConflict = duplicateNames.length > 0;
+        const hasDisplayNameConflict = duplicateDisplayNames.length > 0;
+
+        if (hasNameConflict || hasDisplayNameConflict) {
+          setPendingImportData({
+            agentInfo,
+          });
         } else {
-          message.error(
-            result.message || t("businessLogic.config.error.agentImportFailed")
-          );
+          await runAgentImport(agentInfo, t);
         }
       } catch (error) {
         log.error(t("agentConfig.agents.importFailed"), error);
         message.error(t("businessLogic.config.error.agentImportFailed"));
-      } finally {
-        setIsImporting(false);
       }
     };
 
     fileInput.click();
   };
+
+  const handleConfirmedDuplicateImport = useCallback(async () => {
+    if (!pendingImportData) {
+      return;
+    }
+    setImportingAction("regenerate");
+    const success = await runAgentImport(pendingImportData.agentInfo, t);
+    if (success) {
+      setPendingImportData(null);
+    }
+    setImportingAction(null);
+  }, [pendingImportData, runAgentImport, t]);
+
+  const handleForceDuplicateImport = useCallback(async () => {
+    if (!pendingImportData) {
+      return;
+    }
+    setImportingAction("force");
+    const success = await runAgentImport(pendingImportData.agentInfo, t, {
+      forceImport: true,
+    });
+    if (success) {
+      setPendingImportData(null);
+    }
+    setImportingAction(null);
+  }, [pendingImportData, runAgentImport, t]);
 
   // Handle confirmed deletion
   const handleConfirmDelete = async (t: TFunction) => {
@@ -1621,9 +1769,26 @@ export default function AgentSetupOrchestrator({
             skipUnsavedCheckRef.current = false;
           }, 0);
           onEditingStateChange?.(false, null);
+        } else {
+          // If deleting another agent that is in enabledAgentIds, remove it and update baseline
+          // to avoid triggering false unsaved changes indicator
+          const deletedId = Number(agentToDelete.id);
+          if (enabledAgentIds.includes(deletedId)) {
+            const updatedEnabledAgentIds = enabledAgentIds.filter(
+              (id) => id !== deletedId
+            );
+            setEnabledAgentIds(updatedEnabledAgentIds);
+            // Update baseline to reflect this change so it doesn't trigger unsaved changes
+            if (baselineRef.current) {
+              baselineRef.current = {
+                ...baselineRef.current,
+                enabledAgentIds: updatedEnabledAgentIds.sort((a, b) => a - b),
+              };
+            }
+          }
         }
-        // Refresh agent list
-        refreshAgentList(t);
+        // Refresh agent list without clearing tools to avoid triggering false unsaved changes indicator
+        refreshAgentList(t, false);
       } else {
         message.error(
           result.message || t("businessLogic.config.error.agentDeleteFailed")
@@ -1761,6 +1926,12 @@ export default function AgentSetupOrchestrator({
       constraintContent?.trim() ||
       fewShotsContent?.trim())
   );
+
+  const isForceDuplicateDisabled =
+    isImporting && importingAction === "regenerate";
+  const isRegenerateDuplicateDisabled =
+    isImporting && importingAction === "force";
+  const isForceDuplicateLoading = isImporting && importingAction === "force";
 
   return (
     <TooltipProvider>
@@ -2014,7 +2185,77 @@ export default function AgentSetupOrchestrator({
             // Only close modal, don't execute discard logic
             setIsSaveConfirmOpen(false);
           }}
+          canSave={localCanSaveAgent}
+          invalidReason={
+            localCanSaveAgent ? undefined : getLocalButtonTitle() || undefined
+          }
         />
+        {/* Duplicate import confirmation */}
+        <Modal
+          open={!!pendingImportData}
+          title={
+            <div className="flex items-center gap-2">
+              <WarningFilled className="text-amber-500" />
+              <span>{t("businessLogic.config.import.duplicateTitle")}</span>
+            </div>
+          }
+          onCancel={() => {
+            if (isImporting) {
+              return;
+            }
+            setPendingImportData(null);
+          }}
+          maskClosable={!isImporting}
+          closable={!isImporting}
+          centered
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button
+                onClick={() => !isImporting && setPendingImportData(null)}
+                disabled={isImporting}
+              >
+                {t("businessLogic.config.import.duplicateCancel")}
+              </Button>
+              <Tooltip
+                title={t("businessLogic.config.import.forceWarning")}
+                placement="top"
+              >
+                <Button
+                  type="default"
+                  className={
+                    isForceDuplicateDisabled
+                      ? "bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed"
+                      : isForceDuplicateLoading
+                      ? "!bg-amber-200 !border-amber-500 !text-amber-800 cursor-default"
+                      : "!border-amber-400 !text-amber-700 !bg-amber-50 hover:!bg-amber-200 hover:!border-amber-500 hover:!text-amber-800"
+                  }
+                  onClick={handleForceDuplicateImport}
+                  loading={isForceDuplicateLoading}
+                  disabled={isForceDuplicateDisabled}
+                >
+                  {t("businessLogic.config.import.forceButton")}
+                </Button>
+              </Tooltip>
+              <Tooltip
+                title={t("businessLogic.config.import.regenerateTooltip")}
+                placement="top"
+              >
+                <Button
+                  type="primary"
+                  onClick={handleConfirmedDuplicateImport}
+                  loading={isImporting && importingAction === "regenerate"}
+                  disabled={isRegenerateDuplicateDisabled}
+                >
+                  {t("businessLogic.config.import.duplicateConfirm")}
+                </Button>
+              </Tooltip>
+            </div>
+          }
+        >
+          <p className="text-sm text-gray-700">
+            {t("businessLogic.config.import.duplicateDescription")}
+          </p>
+        </Modal>
         {/* Auto unselect knowledge_base_search notice when embedding not configured */}
         <Modal
           title={t("embedding.agentToolAutoDeselectModal.title")}

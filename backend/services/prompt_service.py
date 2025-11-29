@@ -5,97 +5,26 @@ import threading
 from typing import Optional, List
 
 from jinja2 import StrictUndefined, Template
-from smolagents import OpenAIServerModel
 
-from consts.const import LANGUAGE, MESSAGE_ROLE, THINK_END_PATTERN, THINK_START_PATTERN
+from consts.const import LANGUAGE
 from consts.model import AgentInfoRequest
-from database.agent_db import update_agent, search_agent_info_by_agent_id
-from database.model_management_db import get_model_by_model_id
+from database.agent_db import update_agent, search_agent_info_by_agent_id, query_all_agent_info_by_tenant_id, \
+    query_sub_agents_id_list
 from database.tool_db import query_tools_by_ids
-from utils.config_utils import get_model_name_from_config
+from services.agent_service import (
+    get_enable_tool_id_by_agent_id,
+    _check_agent_name_duplicate,
+    _check_agent_display_name_duplicate,
+    _regenerate_agent_name_with_llm,
+    _regenerate_agent_display_name_with_llm,
+    _generate_unique_agent_name_with_suffix,
+    _generate_unique_display_name_with_suffix
+)
+from utils.llm_utils import call_llm_for_system_prompt
 from utils.prompt_template_utils import get_prompt_generate_prompt_template
 
 # Configure logging
 logger = logging.getLogger("prompt_service")
-
-
-def _process_thinking_tokens(new_token: str, is_thinking: bool, token_join: list, callback=None) -> bool:
-    """
-    Process tokens to filter out thinking content between <think> and </think> tags
-
-    Args:
-        new_token: Current token from LLM stream
-        is_thinking: Current thinking state
-        token_join: List to accumulate non-thinking tokens
-        callback: Callback function for streaming output
-
-    Returns:
-        bool: updated_is_thinking
-    """
-    # Handle thinking mode
-    if is_thinking:
-        return THINK_END_PATTERN not in new_token
-
-    # Handle start of thinking
-    if THINK_START_PATTERN in new_token:
-        return True
-
-    # Normal token processing
-    token_join.append(new_token)
-    if callback:
-        callback("".join(token_join))
-
-    return False
-
-
-def call_llm_for_system_prompt(model_id: int, user_prompt: str, system_prompt: str, callback=None, tenant_id: str = None) -> str:
-    """
-    Call LLM to generate system prompt
-
-    Args:
-        model_id: select model for generate prompt
-        user_prompt: description of the current task
-        system_prompt: system prompt for the LLM
-        callback: callback function
-        tenant_id: tenant id
-
-    Returns:
-        str: Generated system prompt
-    """
-
-    llm_model_config = get_model_by_model_id(model_id=model_id, tenant_id=tenant_id)
-
-    llm = OpenAIServerModel(
-        model_id=get_model_name_from_config(
-            llm_model_config) if llm_model_config else "",
-        api_base=llm_model_config.get("base_url", ""),
-        api_key=llm_model_config.get("api_key", ""),
-        temperature=0.3,
-        top_p=0.95
-    )
-    messages = [{"role": MESSAGE_ROLE["SYSTEM"], "content": system_prompt},
-                {"role": MESSAGE_ROLE["USER"], "content": user_prompt}]
-    try:
-        completion_kwargs = llm._prepare_completion_kwargs(
-            messages=messages,
-            model=llm.model_id,
-            temperature=0.3,
-            top_p=0.95
-        )
-        current_request = llm.client.chat.completions.create(
-            stream=True, **completion_kwargs)
-        token_join = []
-        is_thinking = False
-        for chunk in current_request:
-            new_token = chunk.choices[0].delta.content
-            if new_token is not None:
-                is_thinking = _process_thinking_tokens(
-                    new_token, is_thinking, token_join, callback
-                )
-        return "".join(token_join)
-    except Exception as e:
-        logger.error(f"Failed to generate prompt from LLM: {str(e)}")
-        raise e
 
 
 def gen_system_prompt_streamable(agent_id: int, model_id: int, task_description: str, user_id: str, tenant_id: str, language: str, tool_ids: Optional[List[int]] = None, sub_agent_ids: Optional[List[int]] = None):
@@ -129,8 +58,10 @@ def generate_and_save_system_prompt_impl(agent_id: int,
         tool_info_list = query_tools_by_ids(tool_ids)
         logger.debug(f"Using frontend-provided tool IDs: {tool_ids}")
     else:
-        tool_info_list = []
         logger.debug("No tools selected (empty tool_ids list)")
+        # If no tool IDs provided, get enabled tools from database
+        tool_info_list = get_enabled_tool_description_for_generate_prompt(
+            tenant_id=tenant_id, agent_id=agent_id)
 
     # Handle sub-agent IDs
     if sub_agent_ids and len(sub_agent_ids) > 0:
@@ -145,17 +76,121 @@ def generate_and_save_system_prompt_impl(agent_id: int,
                     f"Failed to get sub-agent info for agent_id {sub_agent_id}: {str(e)}")
         logger.debug(f"Using frontend-provided sub-agent IDs: {sub_agent_ids}")
     else:
-        sub_agent_info_list = []
         logger.debug("No sub-agents selected (empty sub_agent_ids list)")
+        # If no sub-agent IDs provided, get enabled sub-agents from database
+        sub_agent_info_list = get_enabled_sub_agent_description_for_generate_prompt(
+            tenant_id=tenant_id, agent_id=agent_id)
 
     # 1. Real-time streaming push
     final_results = {"duty": "", "constraint": "", "few_shots": "", "agent_var_name": "", "agent_display_name": "",
                      "agent_description": ""}
+    
+    # Get all existing agent names and display names for duplicate checking (only if not in create mode)
+    all_agents = query_all_agent_info_by_tenant_id(tenant_id)
+    existing_names = [
+        agent.get("name")
+        for agent in all_agents
+        if agent.get("name") and agent.get("agent_id") != agent_id
+    ]
+    existing_display_names = [
+        agent.get("display_name")
+        for agent in all_agents
+        if agent.get("display_name") and agent.get("agent_id") != agent_id
+    ]
+    
+    # Collect results and yield non-name fields immediately, but hold name fields for duplicate checking
     for result_data in generate_system_prompt(sub_agent_info_list, task_description, tool_info_list, tenant_id,
                                               model_id, language):
-        # Update final results
-        final_results[result_data["type"]] = result_data["content"]
-        yield result_data
+        result_type = result_data["type"]
+        final_results[result_type] = result_data["content"]
+        
+        # Yield non-name fields immediately
+        if result_type not in ["agent_var_name", "agent_display_name"]:
+            yield result_data
+        else:
+            # If name field is complete, check for duplicates and regenerate if needed before yielding
+            if result_data.get("is_complete", False):
+                if result_type == "agent_var_name":
+                    agent_name = final_results["agent_var_name"]
+                    # Check and regenerate name if duplicate
+                    if _check_agent_name_duplicate(
+                        agent_name,
+                        tenant_id=tenant_id,
+                        exclude_agent_id=agent_id,
+                        agents_cache=all_agents
+                    ):
+                        logger.info(f"Agent name '{agent_name}' already exists, regenerating with LLM")
+                        try:
+                            agent_name = _regenerate_agent_name_with_llm(
+                                original_name=agent_name,
+                                existing_names=existing_names,
+                                task_description=task_description,
+                                model_id=model_id,
+                                tenant_id=tenant_id,
+                                language=language,
+                                agents_cache=all_agents,
+                                exclude_agent_id=agent_id
+                            )
+                            logger.info(f"Regenerated agent name: '{agent_name}'")
+                            final_results["agent_var_name"] = agent_name
+                        except Exception as e:
+                            logger.error(f"Failed to regenerate agent name with LLM: {str(e)}, using fallback")
+                            # Fallback: add suffix
+                            agent_name = _generate_unique_agent_name_with_suffix(
+                                agent_name,
+                                tenant_id=tenant_id,
+                                agents_cache=all_agents,
+                                exclude_agent_id=agent_id
+                            )
+                            final_results["agent_var_name"] = agent_name
+
+                    # Yield the (possibly regenerated) name
+                    yield {
+                        "type": "agent_var_name",
+                        "content": final_results["agent_var_name"],
+                        "is_complete": True
+                    }
+
+                elif result_type == "agent_display_name":
+                    agent_display_name = final_results["agent_display_name"]
+                    # Check and regenerate display_name if duplicate
+                    if _check_agent_display_name_duplicate(
+                        agent_display_name,
+                        tenant_id=tenant_id,
+                        exclude_agent_id=agent_id,
+                        agents_cache=all_agents
+                    ):
+                        logger.info(f"Agent display_name '{agent_display_name}' already exists, regenerating with LLM")
+                        try:
+                            agent_display_name = _regenerate_agent_display_name_with_llm(
+                                original_display_name=agent_display_name,
+                                existing_display_names=existing_display_names,
+                                task_description=task_description,
+                                model_id=model_id,
+                                tenant_id=tenant_id,
+                                language=language,
+                                agents_cache=all_agents,
+                                exclude_agent_id=agent_id
+                            )
+                            logger.info(f"Regenerated agent display_name: '{agent_display_name}'")
+                            final_results["agent_display_name"] = agent_display_name
+                        except Exception as e:
+                            logger.error(f"Failed to regenerate agent display_name with LLM: {str(e)}, using fallback")
+                            # Fallback: add suffix
+                            agent_display_name = _generate_unique_display_name_with_suffix(
+                                agent_display_name,
+                                tenant_id=tenant_id,
+                                agents_cache=all_agents,
+                                exclude_agent_id=agent_id
+                            )
+                            final_results["agent_display_name"] = agent_display_name
+
+                    # Yield the (possibly regenerated) display_name
+                    yield {
+                        "type": "agent_display_name",
+                        "content": final_results["agent_display_name"],
+                        "is_complete": True
+                    }
 
     # 2. Update agent with the final result (skip in create mode)
     if agent_id == 0:
@@ -163,6 +198,7 @@ def generate_and_save_system_prompt_impl(agent_id: int,
     else:
         logger.info(
             "Updating agent with business_description and prompt segments")
+
         agent_info = AgentInfoRequest(
             agent_id=agent_id,
             business_description=task_description,
@@ -312,3 +348,27 @@ def join_info_for_generate_system_prompt(prompt_for_generate, sub_agent_info_lis
         "assistant_description": assistant_description
     })
     return content
+
+
+def get_enabled_tool_description_for_generate_prompt(agent_id: int, tenant_id: str):
+    # Get tool information
+    logger.info("Fetching tool instances")
+    tool_id_list = get_enable_tool_id_by_agent_id(
+        agent_id=agent_id, tenant_id=tenant_id)
+    tool_info_list = query_tools_by_ids(tool_id_list)
+    return tool_info_list
+
+
+def get_enabled_sub_agent_description_for_generate_prompt(agent_id: int, tenant_id: str):
+    logger.info("Fetching sub-agents information")
+
+    sub_agent_id_list = query_sub_agents_id_list(
+        main_agent_id=agent_id, tenant_id=tenant_id)
+
+    sub_agent_info_list = []
+    for sub_agent_id in sub_agent_id_list:
+        sub_agent_info = search_agent_info_by_agent_id(
+            agent_id=sub_agent_id, tenant_id=tenant_id)
+
+        sub_agent_info_list.append(sub_agent_info)
+    return sub_agent_info_list
