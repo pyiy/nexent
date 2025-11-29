@@ -11,13 +11,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   fetchAgentList,
   updateAgent,
-  importAgent,
   deleteAgent,
   exportAgent,
   searchAgentInfo,
   searchToolConfig,
   updateToolConfig,
 } from "@/services/agentConfigService";
+import { useAgentImport } from "@/hooks/useAgentImport";
 import {
   Agent,
   AgentSetupOrchestratorProps,
@@ -1541,6 +1541,31 @@ export default function AgentSetupOrchestrator({
     }
   };
 
+  // Use unified import hooks - one for normal import, one for force import
+  const { importFromData: runNormalImport } = useAgentImport({
+    onSuccess: () => {
+      message.success(t("businessLogic.config.error.agentImportSuccess"));
+      refreshAgentList(t, false);
+    },
+    onError: (error) => {
+      log.error(t("agentConfig.agents.importFailed"), error);
+      message.error(t("businessLogic.config.error.agentImportFailed"));
+    },
+    forceImport: false,
+  });
+
+  const { importFromData: runForceImport } = useAgentImport({
+    onSuccess: () => {
+      message.success(t("businessLogic.config.error.agentImportSuccess"));
+      refreshAgentList(t, false);
+    },
+    onError: (error) => {
+      log.error(t("agentConfig.agents.importFailed"), error);
+      message.error(t("businessLogic.config.error.agentImportFailed"));
+    },
+    forceImport: true,
+  });
+
   const runAgentImport = useCallback(
     async (
       agentPayload: any,
@@ -1549,31 +1574,19 @@ export default function AgentSetupOrchestrator({
     ) => {
       setIsImporting(true);
       try {
-        const result = await importAgent(agentPayload, options);
-
-        if (result.success) {
-          message.success(
-            translationFn("businessLogic.config.error.agentImportSuccess")
-          );
-          // Don't clear tools when importing to avoid triggering false unsaved changes indicator
-          await refreshAgentList(translationFn, false);
-          return true;
+        if (options?.forceImport) {
+          await runForceImport(agentPayload);
+        } else {
+          await runNormalImport(agentPayload);
         }
-
-        message.error(
-          result.message ||
-            translationFn("businessLogic.config.error.agentImportFailed")
-        );
-        return false;
+        return true;
       } catch (error) {
-        log.error(translationFn("agentConfig.agents.importFailed"), error);
-        message.error(translationFn("businessLogic.config.error.agentImportFailed"));
         return false;
       } finally {
         setIsImporting(false);
       }
     },
-    [message, refreshAgentList]
+    [runNormalImport, runForceImport]
   );
 
   // Handle importing agent

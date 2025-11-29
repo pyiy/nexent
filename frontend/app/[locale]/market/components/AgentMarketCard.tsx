@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Download, Tag, Wrench } from "lucide-react";
 import { MarketAgentListItem } from "@/types/market";
 import { useTranslation } from "react-i18next";
+import { getGenericLabel } from "@/lib/agentLabelMapper";
 
 interface AgentMarketCardProps {
   agent: MarketAgentListItem;
@@ -51,9 +52,7 @@ export function AgentMarketCard({
                 ? isZh
                   ? agent.category.display_name_zh
                   : agent.category.display_name
-                : isZh
-                ? "其他"
-                : "Other"}
+                : t("market.category.other", "Other")}
             </span>
           </div>
           <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
@@ -83,7 +82,7 @@ export function AgentMarketCard({
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
               >
                 <Tag className="h-3 w-3" />
-                {tag.display_name}
+                {getGenericLabel(tag.display_name, t)}
               </span>
             ))}
             {agent.tags.length > 3 && (
