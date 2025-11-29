@@ -20,7 +20,8 @@ import ModelsContent from "./models/ModelsContent";
 import AgentsContent from "./agents/AgentsContent";
 import KnowledgesContent from "./knowledges/KnowledgesContent";
 import { SpaceContent } from "./space/components/SpaceContent";
-import { fetchAgentList, importAgent } from "@/services/agentConfigService";
+import { fetchAgentList } from "@/services/agentConfigService";
+import { useAgentImport } from "@/hooks/useAgentImport";
 import SetupLayout from "./setup/SetupLayout";
 import { ChatContent } from "./chat/internal/ChatContent";
 import { ChatTopNavContent } from "./chat/internal/ChatTopNavContent";
@@ -149,8 +150,8 @@ export default function Home() {
       }
       
       // Load data for specific views
-      if (viewType === "space" && agents.length === 0) {
-        loadAgents();
+      if (viewType === "space") {
+        loadAgents(); // Always refresh agents when entering space
       }
     };
     
@@ -186,6 +187,20 @@ export default function Home() {
       }
     };
     
+    // Use unified import hook for space view
+    const { importFromFile: importAgentFile } = useAgentImport({
+      onSuccess: () => {
+        message.success(t("businessLogic.config.error.agentImportSuccess"));
+        loadAgents();
+        setIsImporting(false);
+      },
+      onError: (error) => {
+        log.error(t("agentConfig.agents.importFailed"), error);
+        message.error(t("businessLogic.config.error.agentImportFailed"));
+        setIsImporting(false);
+      },
+    });
+
     // Handle import agent for space view
     const handleImportAgent = () => {
       const fileInput = document.createElement("input");
@@ -202,32 +217,9 @@ export default function Home() {
 
         setIsImporting(true);
         try {
-          const fileContent = await file.text();
-          let agentInfo;
-
-          try {
-            agentInfo = JSON.parse(fileContent);
-          } catch (parseError) {
-            message.error(t("businessLogic.config.error.invalidFileType"));
-            setIsImporting(false);
-            return;
-          }
-
-          const result = await importAgent(agentInfo);
-
-          if (result.success) {
-            message.success(t("businessLogic.config.error.agentImportSuccess"));
-            loadAgents();
-          } else {
-            message.error(
-              result.message || t("businessLogic.config.error.agentImportFailed")
-            );
-          }
+          await importAgentFile(file);
         } catch (error) {
-          log.error(t("agentConfig.agents.importFailed"), error);
-          message.error(t("businessLogic.config.error.agentImportFailed"));
-        } finally {
-          setIsImporting(false);
+          // Error already handled by hook's onError callback
         }
       };
 

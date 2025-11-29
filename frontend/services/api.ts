@@ -160,6 +160,29 @@ export const API_ENDPOINTS = {
       clear: `${API_BASE_URL}/memory/clear`,
     },
   },
+  market: {
+    agents: (params?: {
+      page?: number;
+      page_size?: number;
+      category?: string;
+      tag?: string;
+      search?: string;
+    }) => {
+      const queryParams = new URLSearchParams();
+      if (params?.page) queryParams.append('page', params.page.toString());
+      if (params?.page_size) queryParams.append('page_size', params.page_size.toString());
+      if (params?.category) queryParams.append('category', params.category);
+      if (params?.tag) queryParams.append('tag', params.tag);
+      if (params?.search) queryParams.append('search', params.search);
+      
+      const queryString = queryParams.toString();
+      return `${API_BASE_URL}/market/agents${queryString ? `?${queryString}` : ''}`;
+    },
+    agentDetail: (agentId: number) => `${API_BASE_URL}/market/agents/${agentId}`,
+    categories: `${API_BASE_URL}/market/categories`,
+    tags: `${API_BASE_URL}/market/tags`,
+    mcpServers: (agentId: number) => `${API_BASE_URL}/market/agents/${agentId}/mcp_servers`,
+  },
 };
 
 // Common error handling
